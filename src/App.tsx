@@ -107,7 +107,18 @@ const Sidebar = ({ activeView, setView }: { activeView: View, setView: (v: View)
         </div>
       </nav>
 
-      <div className="mt-auto">
+      <div className="mt-auto flex flex-col gap-4">
+        <button 
+          onClick={() => {
+            if (confirm('هل أنت متأكد من مسح جميع البيانات؟')) {
+              localStorage.clear();
+              window.location.reload();
+            }
+          }}
+          className="text-[10px] text-white/20 hover:text-red-400 transition-colors uppercase tracking-widest font-black"
+        >
+          إعادة ضبط جميع البيانات
+        </button>
         <div className="p-6 bg-white/5 rounded-3xl border border-white/5 backdrop-blur-sm">
           <p className="text-xs text-white/40 mb-1 font-light italic">الدعم المتميز</p>
           <p className="text-sm mb-4 font-medium text-white/90">تحتاج إلى مساعدة؟</p>
@@ -120,7 +131,7 @@ const Sidebar = ({ activeView, setView }: { activeView: View, setView: (v: View)
   );
 };
 
-const TopBar = () => {
+const TopBar = ({ netValue }: { netValue: number }) => {
   return (
     <header className="flex justify-between items-center w-full px-12 py-6 bg-bakery-surface sticky top-0 z-30 lg:pr-72">
       <div className="flex items-center gap-4">
@@ -137,7 +148,7 @@ const TopBar = () => {
       <div className="flex items-center gap-6">
         <div className="flex flex-col items-end">
           <p className="text-[10px] uppercase tracking-widest text-white/30 mb-0.5">صافي القيمة</p>
-          <p className="text-lg font-bold text-primary leading-none">$1,240,500</p>
+          <p className="text-lg font-bold text-primary leading-none">{formatCurrency(netValue)}</p>
         </div>
         <div className="h-10 w-px bg-white/10"></div>
         <button className="w-12 h-12 rounded-full border border-white/10 bg-white/5 flex items-center justify-center text-lg hover:bg-white/10 transition-colors relative group">
@@ -231,89 +242,80 @@ const StatusBadge = ({ status }: { status: InventoryItem['status'] }) => {
 
 // --- Page Content ---
 
-const Dashboard = () => {
-  const chartData = [
-    { name: 'السبت', income: 45000, expense: 32000 },
-    { name: 'الأحد', income: 52000, expense: 38000 },
-    { name: 'الاثنين', income: 41000, expense: 29000 },
-    { name: 'الثلاثاء', income: 63000, expense: 42000 },
-    { name: 'الأربعاء', income: 58000, expense: 35000 },
-    { name: 'الخميس', income: 72000, expense: 45000 },
-    { name: 'الجمعة', income: 68000, expense: 41000 },
-  ];
-
-  const inventoryItems: InventoryItem[] = [
-    { id: '1', name: 'دقيق قمح ممتاز', quantity: 120, unit: 'جوال', price: 18500, status: 'available', icon: Wheat },
-    { id: '2', name: 'خميرة فورية', quantity: 2, unit: 'كرتونة', price: 45000, status: 'low', icon: Beaker },
-    { id: '3', name: 'سكر أبيض', quantity: 45, unit: 'جوال', price: 32000, status: 'available', icon: Droplets },
-    { id: '4', name: 'وقود (ديزل)', quantity: 850, unit: 'لتر', price: 1150, status: 'available', icon: Fuel },
-  ];
+const Dashboard = ({ stats, transactions, inventory }: any) => {
+  const lowStock = inventory.filter((i: any) => i.status === 'low' || i.status === 'out');
 
   return (
     <div className="flex flex-col gap-10 animate-in fade-in duration-700">
       <div className="flex flex-col sm:flex-row justify-between items-end gap-4">
         <div>
           <h1 className="text-4xl font-light text-white mb-2">مرحباً، <span className="font-medium text-primary">مدير المخبز</span></h1>
-          <p className="text-white/40 text-sm font-light italic">آخر تحديث للبيانات الاستثمارية: اليوم، 10:45 صباحاً</p>
+          <p className="text-white/40 text-sm font-light italic">آخر تحديث للبيانات الاستثمارية: {new Date().toLocaleTimeString('ar-EG')}</p>
         </div>
-        <button className="flex items-center gap-3 bg-primary text-black px-8 py-3.5 rounded-2xl font-bold hover:bg-primary/90 transition-all shadow-xl shadow-primary/10 active:scale-95">
-          <PlusCircle size={20} />
-          <span>توسيع المحفظة</span>
-        </button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="خزنة النقد النقدية" value="450,000" unit="ج.س" trend={12} color="bg-primary" icon={Wallet} />
-        <StatCard title="عائدات اليوم" value="120,000" unit="ج.س" trend={5} color="bg-emerald-500" icon={TrendingUp} />
-        <StatCard title="التفقات الجارية" value="85,000" unit="ج.س" trend={-2} color="bg-red-500" icon={TrendingDown} />
-        <StatCard title="الالتزامات الخارجية" value="210,000" unit="ج.س" color="bg-primary" icon={Users} />
+        <StatCard title="إجمالي القيمة الحالية" value={formatCurrency(stats.netValue)} trend={12} color="bg-primary" icon={Wallet} />
+        <StatCard title="عائدات الجلسة" value={formatCurrency(stats.dailyIncome)} trend={5} color="bg-emerald-500" icon={TrendingUp} />
+        <StatCard title="التفقات الجارية" value={formatCurrency(stats.dailyExpense)} trend={-2} color="bg-red-500" icon={TrendingDown} />
+        <StatCard title="الالتزامات الخارجية" value={formatCurrency(stats.totalDebt)} color="bg-primary" icon={Users} />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
         <div className="xl:col-span-8 bg-gradient-to-bl from-[#1c1c1c] to-[#121212] rounded-[32px] p-8 shadow-2xl border border-white/5 flex flex-col justify-between h-[380px]">
           <div className="flex justify-between items-start">
             <div>
-              <span className="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-[10px] text-white/60 mb-6 inline-block italic tracking-wider">أداء رأس المال</span>
-              <h2 className="text-6xl font-light text-white">+12.4%</h2>
-              <p className="text-white/40 text-sm mt-3 font-light">نمو إيجابي مقارنة بدورة الإنتاج السابقة</p>
+              <span className="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-[10px] text-white/60 mb-6 inline-block italic tracking-wider">كفاءة الإنتاج</span>
+              <h2 className="text-6xl font-light text-white">+{((stats.dailyIncome / (stats.dailyExpense || 1)) * 10).toFixed(1)}%</h2>
+              <p className="text-white/40 text-sm mt-3 font-light">نسبة استرداد التكاليف للدورة الحالية</p>
             </div>
             <div className="flex gap-1.5 items-end h-24">
-              <div className="w-1.5 h-8 bg-primary/20 rounded-full"></div>
-              <div className="w-1.5 h-12 bg-primary/40 rounded-full"></div>
-              <div className="w-1.5 h-16 bg-primary/60 rounded-full"></div>
-              <div className="w-1.5 h-20 bg-primary rounded-full shadow-[0_0_15px_rgba(197,160,89,0.3)]"></div>
+              {transactions.slice(0, 8).map((t: any, i: number) => (
+                <div key={i} className={cn("w-1.5 rounded-full", t.type === 'income' ? 'bg-primary' : 'bg-white/10')} style={{ height: `${Math.min(t.amount/1000, 100)}%` }}></div>
+              ))}
             </div>
           </div>
           <div className="flex gap-16 border-t border-white/5 pt-8">
             <div>
-              <p className="text-[10px] uppercase tracking-widest text-white/30 mb-2">العائد المتوقع</p>
-              <p className="text-2xl font-medium text-white">$142,000</p>
+              <p className="text-[10px] uppercase tracking-widest text-white/30 mb-2">إجمالي تحركات العملة</p>
+              <p className="text-2xl font-medium text-white">{transactions.length} قيود</p>
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-widest text-white/30 mb-2">الأرباح الصافية</p>
-              <p className="text-2xl font-medium text-white">$34,500</p>
+              <p className="text-[10px] uppercase tracking-widest text-white/30 mb-2">هامش الربح الفوري</p>
+              <p className="text-2xl font-medium text-white">{formatCurrency(stats.dailyIncome - stats.dailyExpense)}</p>
             </div>
           </div>
         </div>
 
         <div className="xl:col-span-4 flex flex-col gap-6">
-          <div className="bg-primary rounded-[32px] p-8 flex flex-col justify-between shadow-2xl h-[380px]">
+          <div className={cn("rounded-[32px] p-8 flex flex-col justify-between shadow-2xl h-[380px] transition-all duration-500", lowStock.length > 0 ? "bg-red-500 text-white" : "bg-primary text-black")}>
              <div className="flex justify-between items-start">
                 <div className="p-3 bg-black/20 rounded-2xl backdrop-blur-md">
-                  <Wallet size={24} className="text-black/70" />
+                   {lowStock.length > 0 ? <AlertTriangle size={24} /> : <Package size={24} />}
                 </div>
-                <span className="text-black/60 text-[10px] font-bold uppercase tracking-widest">البطاقة المتميزة</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest leading-none">{lowStock.length > 0 ? 'تنبيه مخزون منخفض' : 'المخزون مستقر'}</span>
              </div>
-             <div>
-                <p className="text-black/40 text-[10px] mb-1 font-mono uppercase">كود التشفير</p>
-                <p className="text-black text-2xl font-bold tracking-[0.2em]">**** 8829</p>
-             </div>
+             {lowStock.length > 0 ? (
+               <div className="space-y-4">
+                  {lowStock.slice(0, 3).map((item: any) => (
+                    <div key={item.id} className="flex justify-between items-center border-b border-black/10 pb-2">
+                       <span className="font-bold">{item.name}</span>
+                       <span className="text-xs font-black">{item.quantity} {item.unit}</span>
+                    </div>
+                  ))}
+               </div>
+             ) : (
+               <div>
+                  <p className="opacity-60 text-[10px] mb-1 uppercase font-bold">الحالة العامة</p>
+                  <p className="text-2xl font-bold tracking-tight">جميع الموارد ضمن الحدود الآمنة</p>
+               </div>
+             )}
              <div className="flex justify-between items-end">
-                <div className="text-black">
-                  <p className="text-[10px] opacity-60 uppercase font-bold mb-1">الرصيد المتاح</p>
-                  <p className="text-4xl font-black">$42,800</p>
+                <div>
+                  <p className="text-[10px] opacity-60 uppercase font-bold mb-1">المواد المنخفضة</p>
+                  <p className="text-4xl font-black">{lowStock.length}</p>
                 </div>
-                <div className="w-14 h-14 bg-black rounded-full flex items-center justify-center text-white text-xs font-black shadow-xl">GOLD</div>
+                <div className="w-14 h-14 bg-black rounded-full flex items-center justify-center text-white text-xs font-black shadow-xl">LOG</div>
              </div>
           </div>
         </div>
@@ -323,23 +325,22 @@ const Dashboard = () => {
         <div className="flex flex-col">
           <div className="flex justify-between items-center mb-8">
              <h3 className="text-sm font-bold tracking-[0.2em] text-white/70 uppercase">أحدث التحركات المالية</h3>
-             <button className="text-xs text-primary font-bold tracking-wider hover:underline">عرض الكل</button>
           </div>
           <div className="space-y-4">
-             {[
-               { icon: '🥐', title: 'مبيعات الصباح', desc: 'تم التسوية - الوردية A', val: '+12,000', color: 'text-emerald-400' },
-               { icon: '📦', title: 'توريد مواد خام', desc: 'مطاحن الدقيق الوطنية', val: '-45,000', color: 'text-white' },
-               { icon: '⚡️', title: 'مصاريف تشغيل', desc: 'فاتورة الكهرباء والوقود', val: '-8,500', color: 'text-white' }
-             ].map((t, i) => (
+             {transactions.slice(0, 3).map((t: any, i: number) => (
                <div key={i} className="bg-surface-card p-5 rounded-3xl flex justify-between items-center border border-white/[0.03] hover:border-white/10 transition-all group">
                  <div className="flex items-center gap-5">
-                   <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">{t.icon}</div>
+                   <div className={cn("w-12 h-12 rounded-full flex items-center justify-center text-xl transition-transform", t.type === 'income' ? 'bg-primary/10 text-primary' : 'bg-white/5 text-white/40')}>
+                     {t.type === 'income' ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
+                   </div>
                    <div>
-                     <p className="text-sm font-medium text-white">{t.title}</p>
-                     <p className="text-[10px] text-white/30 italic mt-0.5">{t.desc}</p>
+                     <p className="text-sm font-medium text-white">{t.description}</p>
+                     <p className="text-[10px] text-white/30 italic mt-0.5">{t.date}</p>
                    </div>
                  </div>
-                 <span className={cn("text-sm font-bold tracking-tight", t.color)}>{t.val} ج.س</span>
+                 <span className={cn("text-sm font-bold tracking-tight", t.type === 'income' ? "text-primary" : "text-white/60")}>
+                   {t.type === 'income' ? '+' : '-'}{formatCurrency(t.amount)}
+                 </span>
                </div>
              ))}
           </div>
@@ -375,24 +376,35 @@ const Dashboard = () => {
   );
 };
 
-const Finance = () => {
+const Finance = ({ stats, transactions, onAdd }: any) => {
+  const [tab, setTab] = React.useState<'income' | 'expense'>('income');
+  const [amount, setAmount] = React.useState('');
+  const [desc, setDesc] = React.useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!amount || !desc) return;
+    onAdd({
+      description: desc,
+      amount: parseFloat(amount),
+      type: tab,
+      category: tab === 'income' ? 'sales' : 'expense'
+    });
+    setAmount('');
+    setDesc('');
+  };
+
   return (
     <div className="flex flex-col gap-10 animate-in slide-in-from-bottom-8 duration-700">
       <div className="flex flex-col md:flex-row justify-between items-end gap-6 bg-surface-card p-10 rounded-[40px] border border-white/5 shadow-2xl">
         <div>
           <h2 className="text-4xl font-light text-white mb-2">المالية والقيود <span className="font-medium">اليومية</span></h2>
-          <p className="text-white/40 text-sm font-light italic">إدارة الإيرادات والمصروفات ليوم الثلاثاء، 24 أكتوبر 2023</p>
+          <p className="text-white/40 text-sm font-light italic">إدارة الإيرادات والمصروفات للدورة الحالية</p>
         </div>
         <div className="flex flex-col items-end bg-primary text-black px-10 py-6 rounded-3xl shadow-2xl relative overflow-hidden min-w-[280px]">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full -translate-y-16 translate-x-16 blur-3xl opacity-50"></div>
           <span className="text-[10px] uppercase tracking-widest font-black opacity-60 mb-2">صافي الربح الفعلي</span>
           <div className="flex items-baseline gap-1 relative z-10">
-            <span className="text-5xl font-black">14,500</span>
-            <span className="text-sm font-black uppercase">SDG</span>
-          </div>
-          <div className="flex items-center gap-2 mt-4 text-black/60 relative z-10 font-bold text-xs uppercase tracking-tighter">
-            <TrendingUp size={14} />
-            <span>+12% نمو دوري</span>
+            <span className="text-5xl font-black">{formatCurrency(stats.dailyIncome - stats.dailyExpense)}</span>
           </div>
         </div>
       </div>
@@ -400,104 +412,73 @@ const Finance = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
         <div className="lg:col-span-5 flex flex-col gap-8">
           <div className="flex bg-white/5 p-2 rounded-[24px] border border-white/5 backdrop-blur-md">
-            <button className="flex-1 py-4 text-xs font-black uppercase tracking-widest text-black bg-primary rounded-2xl shadow-xl">الإيرادات</button>
-            <button className="flex-1 py-4 text-xs font-black uppercase tracking-widest text-white/40 hover:text-white transition-all">المصروفات</button>
+            <button onClick={() => setTab('income')} className={cn("flex-1 py-4 text-xs font-black uppercase tracking-widest rounded-2xl transition-all", tab === 'income' ? "bg-primary text-black" : "text-white/40")}>الإيرادات</button>
+            <button onClick={() => setTab('expense')} className={cn("flex-1 py-4 text-xs font-black uppercase tracking-widest rounded-2xl transition-all", tab === 'expense' ? "bg-red-500 text-white" : "text-white/40")}>المصروفات</button>
           </div>
           <div className="bg-surface-card p-8 rounded-[40px] border border-white/5 shadow-2xl flex flex-col gap-8">
             <h3 className="text-sm font-bold tracking-[0.2em] text-white/80 uppercase flex items-center gap-3 border-b border-white/5 pb-6">
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                <PlusCircle size={20} />
+              <div className={cn("w-10 h-10 rounded-full flex items-center justify-center", tab === 'income' ? "bg-primary/10 text-primary" : "bg-red-500/10 text-red-500")}>
+                {tab === 'income' ? <PlusCircle size={20} /> : <TrendingDown size={20} />}
               </div>
-              تسجيل إدخال مالي جديد
+              تسجيل {tab === 'income' ? 'إيراد' : 'مصروف'} جديد
             </h3>
-            <form className="flex flex-col gap-6">
-              <div className="space-y-2">
-                <label className="block text-[10px] uppercase tracking-widest font-black text-white/30 px-2">الفترة الزمنية</label>
-                <select className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none font-medium text-white transition-all appearance-none cursor-pointer backdrop-blur-md">
-                  <option className="bg-[#1c1c1c]">الوردية الصباحية (Premium)</option>
-                  <option className="bg-[#1c1c1c]">الوردية المسائية (Elite)</option>
-                </select>
+            <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+               <div className="space-y-2">
+                <label className="block text-[10px] uppercase tracking-widest font-black text-white/30 px-2">الوصف / التفاصيل</label>
+                <input 
+                  value={desc}
+                  onChange={(e) => setDesc(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none font-medium text-white transition-all backdrop-blur-md" 
+                  placeholder={tab === 'income' ? "مبيعات الوردية..." : "شراء مواد..."}
+                />
               </div>
               <div className="space-y-2">
-                <label className="block text-[10px] uppercase tracking-widest font-black text-white/30 px-2">إجمالي المبيعات المحققة</label>
+                <label className="block text-[10px] uppercase tracking-widest font-black text-white/30 px-2">المبلغ المالي</label>
                 <div className="relative">
                   <input 
                     type="number" 
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
                     className="w-full bg-white/5 border border-white/10 rounded-2xl pl-20 pr-6 py-4 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none font-medium text-white transition-all text-left placeholder:text-white/10" 
                     placeholder="00.00" 
                   />
                   <span className="absolute left-6 top-4.5 text-[10px] font-black tracking-widest text-primary uppercase">SDG</span>
                 </div>
               </div>
-              <div className="space-y-2">
-                <label className="block text-[10px] uppercase tracking-widest font-black text-white/30 px-2">ملاحظات التدقيق الإضافية</label>
-                <textarea 
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none font-medium text-white transition-all h-24 resize-none placeholder:text-white/10" 
-                  placeholder="أدخل تفاصيل القيود المالية والملاحظات الرقابية..."
-                ></textarea>
-              </div>
-              <button className="w-full bg-primary text-black rounded-2xl py-5 font-black uppercase tracking-widest text-xs shadow-2xl shadow-primary/20 hover:bg-primary/90 transition-all active:scale-[0.98] mt-4">
-                تأكيد القيد المالي
+              <button type="submit" className={cn("w-full rounded-2xl py-5 font-black uppercase tracking-widest text-xs shadow-2xl transition-all active:scale-[0.98] mt-4", tab === 'income' ? "bg-primary text-black shadow-primary/20 hover:bg-primary/90" : "bg-red-500 text-white shadow-red-500/20 hover:bg-red-600")}>
+                تأكيد القيد التشغيلي
               </button>
             </form>
           </div>
         </div>
 
         <div className="lg:col-span-7 flex flex-col gap-8">
-          <div className="grid grid-cols-2 gap-8">
-            <div className="bg-surface-card p-8 rounded-[40px] border border-white/5 shadow-2xl flex flex-col justify-between relative overflow-hidden group">
-               <div className="absolute -left-10 -top-10 text-primary opacity-5 group-hover:opacity-10 transition-opacity">
-                <Wallet size={160} />
-              </div>
-              <h4 className="text-[10px] uppercase tracking-widest font-black text-white/30 mb-4 relative z-10">إجمالي الإيرادات المسجلة</h4>
-              <div className="flex items-baseline gap-2 relative z-10">
-                <span className="text-4xl font-black text-white leading-none">22,000</span>
-                <span className="text-[10px] font-black text-primary tracking-widest uppercase">SDG</span>
-              </div>
-            </div>
-            <div className="bg-surface-card p-8 rounded-[40px] border border-white/5 shadow-2xl flex flex-col justify-between relative overflow-hidden group">
-               <div className="absolute -left-10 -top-10 text-white opacity-5 group-hover:opacity-10 transition-opacity">
-                <FileText size={160} />
-              </div>
-              <h4 className="text-[10px] uppercase tracking-widest font-black text-white/30 mb-4 relative z-10">إجمالي النفقات الجارية</h4>
-              <div className="flex items-baseline gap-2 relative z-10">
-                <span className="text-4xl font-black text-white leading-none">7,500</span>
-                <span className="text-[10px] font-black text-white/30 tracking-widest uppercase">SDG</span>
-              </div>
-            </div>
-          </div>
-
           <div className="bg-sidebar border border-white/5 rounded-[40px] shadow-2xl overflow-hidden flex-1 flex flex-col">
             <div className="p-8 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
-              <h3 className="text-sm font-black tracking-[0.2em] text-white/80 uppercase">سجل الإيرادات التفصيلي</h3>
-              <button className="text-primary text-[10px] font-black tracking-widest flex items-center gap-2 hover:underline uppercase">
-                عرض تقرير الأداء
-                <ChevronLeft size={14} />
-              </button>
+              <h3 className="text-sm font-black tracking-[0.2em] text-white/80 uppercase">سجل القيود المالية الجارية</h3>
             </div>
             <div className="overflow-x-auto flex-1">
               <table className="w-full text-right border-collapse">
                 <thead className="bg-black/20 text-white/30 text-[10px] font-black uppercase tracking-widest">
                   <tr>
-                    <th className="py-6 px-10">الطابع الزمني</th>
-                    <th className="py-6 px-10">تصنيف الوردية</th>
-                    <th className="py-6 px-10 text-left">صافي المبلغ</th>
+                    <th className="py-6 px-10">التفاصيل</th>
+                    <th className="py-6 px-10">التوقيت</th>
+                    <th className="py-6 px-10 text-left">المبلغ</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/[0.03]">
-                  {[
-                    { time: '14:30 PM', shift: 'Morning Elite', amount: '12,000' },
-                    { time: '09:15 AM', shift: 'Morning Elite', amount: '10,000' },
-                  ].map((row, i) => (
+                  {transactions.slice(0, 10).map((row: any, i: number) => (
                     <tr key={i} className="hover:bg-white/[0.02] transition-colors group">
-                      <td className="py-6 px-10 text-sm font-medium text-white/90">{row.time}</td>
                       <td className="py-6 px-10">
-                        <span className="inline-flex items-center gap-2 bg-white/5 text-white/60 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/5 group-hover:border-primary/20 group-hover:text-primary transition-all">
-                          <div className="w-1 h-1 rounded-full bg-primary" />
-                          {row.shift}
-                        </span>
+                        <div className="flex items-center gap-3">
+                          <div className={cn("w-1.5 h-1.5 rounded-full", row.type === 'income' ? "bg-primary" : "bg-red-500")} />
+                          <span className="font-bold text-white group-hover:text-primary transition-colors">{row.description}</span>
+                        </div>
                       </td>
-                      <td className="py-6 px-10 text-left font-black text-white tracking-tight">{row.amount} <span className="text-[10px] text-white/20 font-light ml-1 uppercase">SDG</span></td>
+                      <td className="py-6 px-10 text-white/40 text-xs font-medium italic">{row.date}</td>
+                      <td className={cn("py-6 px-10 text-left font-black tracking-tight", row.type === 'income' ? "text-primary" : "text-white/60")}>
+                        {row.type === 'income' ? '+' : '-'}{formatCurrency(row.amount)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -510,7 +491,18 @@ const Finance = () => {
   );
 };
 
-const Contacts = () => {
+const Contacts = ({ contacts, onPay }: { contacts: any[], onPay: (id: string, amount: number, isSupplier: boolean) => void }) => {
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  const [amount, setAmount] = React.useState('');
+
+  const handlePay = () => {
+    if (!selectedId || !amount) return;
+    const contact = contacts.find(c => c.id === selectedId);
+    onPay(selectedId, parseFloat(amount), contact.type === 'supplier');
+    setSelectedId(null);
+    setAmount('');
+  };
+
   return (
     <div className="flex flex-col gap-10 animate-in slide-in-from-left-8 duration-700">
       <div className="flex flex-col gap-2">
@@ -533,8 +525,9 @@ const Contacts = () => {
           <div className="relative z-10">
             <p className="text-white/30 text-[10px] uppercase tracking-widest font-black mb-2">إجمالي مستحقات السوق</p>
             <div className="flex items-baseline gap-2">
-              <span className="text-4xl font-black text-white tracking-tight">45,200</span>
-              <span className="text-xs font-black text-white/20 uppercase tracking-widest">SDG</span>
+              <span className="text-4xl font-black text-white tracking-tight">
+                {formatCurrency(contacts.filter(c => c.type === 'customer').reduce((acc, c) => acc + c.debt, 0))}
+              </span>
             </div>
           </div>
         </div>
@@ -544,17 +537,18 @@ const Contacts = () => {
           <div className="flex justify-between items-start mb-8 relative z-10">
             <span className="bg-primary/10 text-primary font-black text-[10px] px-5 py-2 rounded-full flex items-center gap-2 border border-primary/20 uppercase tracking-widest">
               <TrendingUp size={14} />
-              التزامات التوريد الجارية
+              مديونيات الموردين
             </span>
             <div className="p-4 bg-white/5 rounded-2xl text-primary border border-white/5">
               <Fuel size={26} />
             </div>
           </div>
           <div className="relative z-10">
-            <p className="text-white/30 text-[10px] uppercase tracking-widest font-black mb-2">إجمالي مديونية التوريد</p>
+            <p className="text-white/30 text-[10px] uppercase tracking-widest font-black mb-2">إجمالي الالتزامات المالية</p>
             <div className="flex items-baseline gap-2">
-              <span className="text-4xl font-black text-primary tracking-tight">128,500</span>
-              <span className="text-xs font-black text-primary/30 uppercase tracking-widest">SDG</span>
+              <span className="text-4xl font-black text-primary tracking-tight">
+                {formatCurrency(contacts.filter(c => c.type === 'supplier').reduce((acc, c) => acc + c.balance, 0))}
+              </span>
             </div>
           </div>
         </div>
@@ -565,28 +559,20 @@ const Contacts = () => {
           <div className="p-8 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
             <h2 className="text-sm font-black tracking-[0.2em] text-white/80 uppercase flex items-center gap-3 leading-none">
               <Users size={20} className="text-primary" />
-              سجل ديون العملاء
+              سجل أرصدة العملاء
             </h2>
-            <button className="text-white/30 hover:text-primary transition-all p-3 hover:bg-white/5 rounded-full border border-transparent hover:border-white/5">
-              <Filter size={18} />
-            </button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-right border-collapse">
               <thead className="bg-black/20 text-white/30 text-[10px] font-black uppercase tracking-widest">
                 <tr>
                   <th className="py-6 px-10">هوية العميل</th>
-                  <th className="py-6 px-10">آخر تعامل</th>
                   <th className="py-6 px-10">إجمالي الدين</th>
                   <th className="py-6 px-10 text-center">إجراء</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.03]">
-                {[
-                  { name: 'أحمد محمد', date: '12 أكتوبر', debt: '15,000', initial: 'أ', color: 'bg-primary' },
-                  { name: 'بقالة النور', date: '10 أكتوبر', debt: '22,500', initial: 'ب', color: 'bg-primary/40' },
-                  { name: 'مطعم الأمل', date: '05 أكتوبر', debt: '7,700', initial: 'م', color: 'bg-white/10' },
-                ].map((c, i) => (
+                {contacts.filter(c => c.type === 'customer').map((c, i) => (
                   <tr key={i} className="hover:bg-white/[0.02] transition-colors group">
                     <td className="py-6 px-10">
                       <div className="flex items-center gap-4">
@@ -596,19 +582,15 @@ const Contacts = () => {
                         <span className="font-bold text-white group-hover:text-primary transition-colors">{c.name}</span>
                       </div>
                     </td>
-                    <td className="py-6 px-10 text-white/40 text-xs font-medium italic">{c.date}</td>
-                    <td className="py-6 px-10 font-black text-red-400 tracking-tight">{c.debt} <span className="text-[10px] opacity-30 ml-1">SDG</span></td>
+                    <td className="py-6 px-10 font-black text-red-400 tracking-tight">{formatCurrency(c.debt)}</td>
                     <td className="py-6 px-10 text-center">
-                      <button className="p-3 text-white/20 hover:text-primary transition-all rounded-xl hover:bg-white/5"><Wallet size={18} /></button>
+                      <button onClick={() => setSelectedId(c.id)} className="p-3 text-white/20 hover:text-primary transition-all rounded-xl hover:bg-white/5"><Wallet size={18} /></button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <button className="p-6 text-[10px] font-black uppercase tracking-[0.2em] text-primary hover:bg-white/[0.02] transition-all border-t border-white/[0.05]">
-            عرض القائمة الكاملة
-          </button>
         </div>
 
         <div className="bg-sidebar border border-white/5 rounded-[40px] shadow-2xl flex flex-col overflow-hidden">
@@ -617,26 +599,18 @@ const Contacts = () => {
               <Beaker size={20} className="text-primary" />
               حسابات كبار الموردين
             </h2>
-            <button className="bg-primary/10 text-primary p-3 rounded-full hover:bg-primary/20 transition-all border border-primary/20">
-              <PlusCircle size={20} />
-            </button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-right border-collapse">
               <thead className="bg-black/20 text-white/30 text-[10px] font-black uppercase tracking-widest">
                 <tr>
-                  <th className="py-6 px-10">اسم المؤسسة الورادة</th>
+                  <th className="py-6 px-10">المؤسسة</th>
                   <th className="py-6 px-10">الرصيد المفتوح</th>
-                  <th className="py-6 px-10">دفعة التسوية</th>
                   <th className="py-6 px-10 text-center">تحديث</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.03]">
-                {[
-                  { name: 'مطاحن الدقيق الوطنية', cat: 'دقيق ومخبوزات', balance: '85,000', date: '01 أكتوبر' },
-                  { name: 'شركة الوقود الحديثة', cat: 'غاز الديزل', balance: '32,000', date: '28 سبتمبر' },
-                  { name: 'مورد التغليف البلاستيكي', cat: 'أكياس ومواد تغليف', balance: '11,500', date: '15 سبتمبر' },
-                ].map((s, i) => (
+                {contacts.filter(c => c.type === 'supplier').map((s, i) => (
                   <tr key={i} className="hover:bg-white/[0.02] transition-colors group">
                     <td className="py-6 px-10">
                       <div className="flex flex-col">
@@ -644,10 +618,9 @@ const Contacts = () => {
                         <span className="text-[10px] text-white/20 font-medium mt-1 uppercase tracking-widest">{s.cat}</span>
                       </div>
                     </td>
-                    <td className="py-6 px-10 font-black text-primary tracking-tight">{s.balance} <span className="text-[10px] opacity-30 ml-1">SDG</span></td>
-                    <td className="py-6 px-10 text-white/40 text-xs font-medium italic">{s.date}</td>
+                    <td className="py-6 px-10 font-black text-primary tracking-tight">{formatCurrency(s.balance || 0)}</td>
                     <td className="py-6 px-10 text-center">
-                      <button className="bg-white/5 text-white/60 border border-white/10 hover:bg-primary hover:text-black hover:border-primary px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
+                      <button onClick={() => setSelectedId(s.id)} className="bg-white/5 text-white/60 border border-white/10 hover:bg-primary hover:text-black hover:border-primary px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
                         تسجيل سداد
                       </button>
                     </td>
@@ -656,69 +629,109 @@ const Contacts = () => {
               </tbody>
             </table>
           </div>
-           <button className="p-6 text-[10px] font-black uppercase tracking-[0.2em] text-primary hover:bg-white/[0.02] transition-all border-t border-white/[0.05]">
-            سجل الموردين الكامل
-          </button>
         </div>
       </div>
+
+      {/* Payment Modal */}
+      <AnimatePresence>
+        {selectedId && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[60] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-sidebar w-full max-w-sm rounded-[40px] border border-white/10 p-10 flex flex-col gap-6 shadow-2xl"
+            >
+              <h3 className="text-xl font-bold text-white text-center">تسجيل دفعة مالية</h3>
+              <p className="text-white/40 text-sm text-center italic">تحويل مالي لـ {contacts.find(c => c.id === selectedId)?.name}</p>
+              <div className="space-y-4">
+                <input 
+                  type="number"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-center font-bold text-2xl outline-none focus:ring-2 focus:ring-primary/20"
+                  placeholder="0.00"
+                  autoFocus
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <button onClick={() => setSelectedId(null)} className="py-4 bg-white/5 text-white rounded-2xl font-bold hover:bg-white/10 transition-all">إلغاء</button>
+                  <button onClick={handlePay} className="py-4 bg-primary text-black rounded-2xl font-bold hover:bg-primary/90 transition-all">تأكيد</button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
 
-const Inventory = () => {
+const Inventory = ({ inventory, onUpdate }: any) => {
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  const [amount, setAmount] = React.useState('');
+
+  const handleUpdate = () => {
+    if (!selectedId || !amount) return;
+    onUpdate(selectedId, parseFloat(amount));
+    setSelectedId(null);
+    setAmount('');
+  };
+
   return (
     <div className="flex flex-col gap-10 animate-in zoom-in-95 duration-700">
       <div className="flex flex-col sm:flex-row justify-between items-end gap-6">
         <div>
-          <h1 className="text-4xl font-light text-white mb-2">المخزون <span className="font-medium text-primary">والرقابة الأصولية</span></h1>
-          <p className="text-white/40 text-sm font-light italic">متابعة حركة المواد الخام وكفاءة التخزين اللوجستي</p>
+          <h1 className="text-4xl font-light text-white mb-2">إدارة <span className="font-medium text-primary">المواد الخام الاستراتيجية</span></h1>
+          <p className="text-white/40 text-sm font-light italic">مراقبة مستويات الوقود والدقيق والسلع الأساسية في الوقت الفعلي</p>
         </div>
-        <button className="flex items-center gap-3 bg-white/5 border border-white/10 text-white px-8 py-3.5 rounded-2xl font-bold hover:bg-white/10 transition-all shadow-xl backdrop-blur-md active:scale-95">
-          <Download size={20} />
-          <span className="text-xs uppercase tracking-widest">تصدير التقارير الاستراتيجية</span>
-        </button>
       </div>
 
       <div className="bg-sidebar border border-white/5 rounded-[40px] shadow-2xl overflow-hidden flex flex-col">
-         <div className="p-8 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
-          <h2 className="text-sm font-black tracking-[0.2em] text-white/80 uppercase flex items-center gap-3">
+        <div className="p-8 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+          <h2 className="text-sm font-black tracking-[0.2em] text-white/80 uppercase flex items-center gap-3 leading-none">
             <Package size={20} className="text-primary" />
-             حالة المواد الخام والسلع الوسيطة
+            سجل الجرد والمستودعات المركزية
           </h2>
-          <button className="text-primary text-[10px] font-black tracking-widest flex items-center gap-2 hover:underline uppercase">
-            تحديث جرد المخزن
-            <ChevronLeft size={14} />
-          </button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-right border-collapse">
             <thead className="bg-black/20 text-white/30 text-[10px] font-black uppercase tracking-widest">
               <tr>
-                <th className="py-6 px-10">المادة الأولية</th>
-                <th className="py-6 px-10 text-left">المستوى الحالي</th>
-                <th className="py-6 px-10 text-left">التكلفة الرأسمالية</th>
+                <th className="py-6 px-10">المادة</th>
                 <th className="py-6 px-10 text-center">المؤشر</th>
+                <th className="py-6 px-10">الكمية المتوفرة</th>
+                <th className="py-6 px-10">سعر الوحدة</th>
+                <th className="py-6 px-10 text-center">تحديث</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.03]">
-               {[
-                { name: 'دقيق ممتاز', qty: '120 جوال', cost: '2,220,000', status: 'available', icon: Wheat },
-                { name: 'سكر نقي', qty: '45 جوال', cost: '1,440,000', status: 'available', icon: Droplets },
-                { name: 'خميرة فرنسية', qty: '2 كرتونة', cost: '90,000', status: 'low', icon: Beaker },
-                { name: 'ديزل تشغيل', qty: '850 لتر', cost: '977,500', status: 'available', icon: Fuel },
-               ].map((item, idx) => (
-                 <tr key={idx} className="hover:bg-white/[0.02] transition-colors group">
-                   <td className="py-6 px-10 flex items-center gap-5">
-                     <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-primary group-hover:scale-110 transition-transform"><item.icon size={22} /></div>
-                     <span className="font-bold text-white group-hover:text-primary transition-colors">{item.name}</span>
-                   </td>
-                   <td className="py-6 px-10 text-left font-medium text-white/60 text-sm italic">{item.qty}</td>
-                   <td className="py-6 px-10 text-left font-black text-primary tracking-tight">{item.cost} <span className="text-[10px] opacity-30 ml-1">SDG</span></td>
-                   <td className="py-6 px-10 text-center">
-                     <StatusBadge status={item.status as any} />
-                   </td>
-                 </tr>
-               ))}
+              {inventory.map((item: any, i: number) => (
+                <tr key={i} className="hover:bg-white/[0.02] transition-colors group">
+                  <td className="py-6 px-10">
+                    <div className="flex items-center gap-5">
+                      <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-primary group-hover:scale-110 transition-transform border border-white/5">
+                        <item.icon size={22} />
+                      </div>
+                      <span className="font-bold text-white group-hover:text-primary transition-colors">{item.name}</span>
+                    </div>
+                  </td>
+                  <td className="py-6 px-10 text-center">
+                    <StatusBadge status={item.status} />
+                  </td>
+                  <td className="py-6 px-10">
+                    <div className="flex flex-col">
+                      <span className="font-black text-white tracking-tight">{item.quantity}</span>
+                      <span className="text-[10px] text-white/20 uppercase font-black">{item.unit}</span>
+                    </div>
+                  </td>
+                  <td className="py-6 px-10 font-bold text-white/60 text-sm italic">{formatCurrency(item.price)}</td>
+                  <td className="py-6 px-10 text-center">
+                    <button onClick={() => setSelectedId(item.id)} className="bg-white/5 text-white/40 border border-white/10 hover:bg-primary hover:text-black hover:border-primary px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
+                      تحديث الوارد
+                    </button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -727,50 +740,176 @@ const Inventory = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10 leading-none">
          <div className="bg-surface-card p-10 rounded-[40px] border border-white/5 shadow-2xl flex flex-col gap-8">
             <h3 className="text-sm font-black tracking-[0.2em] text-white/80 uppercase flex items-center gap-4 border-b border-white/5 pb-8 mb-2">
-              <Download size={20} className="text-primary" />
-              أرشيف التقارير المحاسبية
+              <BarChart3 size={20} className="text-primary" />
+              تقرير الكفاءة الاستهلاكية
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <button className="flex flex-col items-center justify-center gap-4 p-8 bg-white/5 border border-white/10 text-white rounded-[32px] font-bold hover:bg-white/10 transition-all group active:scale-95 shadow-xl">
-                <FileText size={32} className="text-primary group-hover:rotate-6 transition-transform" />
-                <span className="text-[10px] uppercase tracking-widest opacity-60">الأرباح (PDF)</span>
-              </button>
-              <button className="flex flex-col items-center justify-center gap-4 p-8 bg-white/5 border border-white/10 text-white rounded-[32px] font-bold hover:bg-white/10 transition-all group active:scale-95 shadow-xl">
-                <TableIcon size={32} className="text-emerald-400 group-hover:-rotate-6 transition-transform" />
-                <span className="text-[10px] uppercase tracking-widest opacity-60">المخزون (Excel)</span>
-              </button>
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center bg-white/5 p-6 rounded-3xl border border-white/5">
+                <span className="text-white/40 text-xs font-bold leading-none">إجمالي قيمة الأصول المخزنة</span>
+                <span className="text-xl font-black text-white">{formatCurrency(inventory.reduce((acc: number, item: any) => acc + (item.quantity * item.price), 0))}</span>
+              </div>
+              <div className="flex justify-between items-center bg-white/5 p-6 rounded-3xl border border-white/5">
+                <span className="text-white/40 text-xs font-bold leading-none">معدل الدوران الأسبوعي</span>
+                <span className="text-xl font-black text-emerald-400">+18.5%</span>
+              </div>
             </div>
          </div>
 
          <div className="bg-primary text-black p-10 rounded-[40px] shadow-2xl flex items-center justify-between group overflow-hidden relative border border-white/10">
             <div className="absolute -left-10 -bottom-10 opacity-10 group-hover:scale-110 transition-transform -rotate-12">
-              <BarChart3 size={240} />
+              <Fuel size={240} />
             </div>
             <div className="relative z-10">
-              <h3 className="text-2xl font-black mb-3 leading-none uppercase tracking-tighter">القدرة الإنتاجية القصوى</h3>
+              <h3 className="text-2xl font-black mb-3 leading-none uppercase tracking-tighter">القدرة الإنتاجية الحالية</h3>
               <p className="text-black/60 text-sm leading-relaxed max-w-[220px] font-medium italic">
-                وفقاً للموارد المتاحة حالياً في المستودعات الاستراتيجية، يمكن إنتاج <span className="text-black font-black underline underline-offset-4 decoration-2">2400</span> وحدة.
+                بناءً على كمية الدقيق والوقود المتوفرة، يمكن تشغيل <span className="text-black font-black underline underline-offset-4 decoration-2">{Math.floor(inventory[0].quantity * 20)}</span> وحدة إنتاجية.
               </p>
             </div>
             <div className="bg-black/10 p-6 rounded-3xl backdrop-blur-md relative z-10 border border-black/5 flex flex-col items-center shadow-inner">
-              <span className="text-5xl font-black tracking-tighter leading-none">85%</span>
-              <p className="text-[10px] uppercase font-black tracking-widest text-black/40 text-center mt-3">الكفاءة التشغيلية</p>
+               <span className="text-5xl font-black tracking-tighter leading-none">{(inventory.filter((i:any) => i.status === 'available').length / inventory.length * 100).toFixed(0)}%</span>
+               <p className="text-[10px] uppercase font-black tracking-widest text-black/40 text-center mt-3">جاهزية التوريد</p>
             </div>
          </div>
       </div>
+
+       {/* Restock Modal */}
+       <AnimatePresence>
+        {selectedId && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[60] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-sidebar w-full max-w-sm rounded-[40px] border border-white/10 p-10 flex flex-col gap-6 shadow-2xl"
+            >
+              <h3 className="text-xl font-bold text-white text-center">تحديث كمية التوريد</h3>
+              <div className="flex flex-col items-center gap-2">
+                 <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center text-primary mb-2 text-2xl font-bold">
+                    {React.createElement(inventory.find((i: any) => i.id === selectedId)?.icon, { size: 32 })}
+                 </div>
+                 <p className="text-white/40 text-sm text-center italic leading-tight">إضافة كمية واردة لمادة: <br/><span className="text-white font-bold text-lg not-italic">{inventory.find((i: any) => i.id === selectedId)?.name}</span></p>
+              </div>
+              <div className="space-y-4 pt-4 border-t border-white/5">
+                <input 
+                  type="number"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-5 text-white text-center font-black text-3xl outline-none focus:ring-2 focus:ring-primary/20"
+                  placeholder="0"
+                  autoFocus
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <button onClick={() => setSelectedId(null)} className="py-4 bg-white/5 text-white/60 rounded-2xl font-bold hover:bg-white/10 transition-all text-xs uppercase tracking-widest">إلغاء</button>
+                  <button onClick={handleUpdate} className="py-4 bg-primary text-black rounded-2xl font-black hover:bg-primary/90 transition-all text-xs uppercase tracking-widest">تحديث</button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
 
 export default function App() {
   const [view, setView] = React.useState<View>('dashboard');
+  
+  // --- Global State ---
+  const [transactions, setTransactions] = React.useState<Transaction[]>(() => {
+    const saved = localStorage.getItem('luxuria_transactions');
+    return saved ? JSON.parse(saved) : [
+      { id: '1', date: '14:30 م', description: 'مبيعات وردية الصباح', amount: 12000, type: 'income', category: 'sales' },
+      { id: '2', date: '09:15 ص', description: 'مبيعات وردية الصباح', amount: 10000, type: 'income', category: 'sales' },
+      { id: '3', date: 'أمس', description: 'شراء دقيق ممتاز', amount: 45000, type: 'expense', category: 'inventory' },
+    ];
+  });
+
+  const ICON_MAP: Record<string, React.ElementType> = { Wheat, Beaker, Droplets, Fuel };
+
+  const [inventory, setInventory] = React.useState<InventoryItem[]>(() => {
+    const saved = localStorage.getItem('luxuria_inventory');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return parsed.map((item: any) => ({
+        ...item,
+        icon: ICON_MAP[item.iconName] || Package
+      }));
+    }
+    return [
+      { id: '1', name: 'دقيق قمح ممتاز', quantity: 120, unit: 'جوال', price: 18500, status: 'available', icon: Wheat, iconName: 'Wheat' } as any,
+      { id: '2', name: 'خميرة فورية', quantity: 2, unit: 'كرتونة', price: 45000, status: 'low', icon: Beaker, iconName: 'Beaker' } as any,
+      { id: '3', name: 'سكر أبيض', quantity: 45, unit: 'جوال', price: 32000, status: 'available', icon: Droplets, iconName: 'Droplets' } as any,
+      { id: '4', name: 'وقود (ديزل)', quantity: 850, unit: 'لتر', price: 1150, status: 'available', icon: Fuel, iconName: 'Fuel' } as any,
+    ];
+  });
+
+  const [contacts, setContacts] = React.useState(() => {
+    const saved = localStorage.getItem('luxuria_contacts');
+    return saved ? JSON.parse(saved) : [
+      { id: '1', name: 'أحمد محمد', date: '12 أكتوبر', debt: 15000, initial: 'أ', color: 'bg-primary', type: 'customer' },
+      { id: '2', name: 'بقالة النور', date: '10 أكتوبر', debt: 22500, initial: 'ب', color: 'bg-primary/40', type: 'customer' },
+      { id: '3', name: 'مطعم الأمل', date: '05 أكتوبر', debt: 7700, initial: 'م', color: 'bg-white/10', type: 'customer' },
+      { id: '4', name: 'مطاحن الدقيق الوطنية', cat: 'دقيق ومخبوزات', balance: 85000, date: '01 أكتوبر', type: 'supplier' },
+      { id: '5', name: 'شركة الوقود الحديثة', cat: 'غاز الديزل', balance: 32000, date: '28 سبتمبر', type: 'supplier' },
+    ];
+  });
+
+  // --- Persistence Effects ---
+  React.useEffect(() => {
+    localStorage.setItem('luxuria_transactions', JSON.stringify(transactions));
+  }, [transactions]);
+
+  React.useEffect(() => {
+    const dataToSave = inventory.map(({ icon, ...rest }: any) => rest);
+    localStorage.setItem('luxuria_inventory', JSON.stringify(dataToSave));
+  }, [inventory]);
+
+  React.useEffect(() => {
+    localStorage.setItem('luxuria_contacts', JSON.stringify(contacts));
+  }, [contacts]);
+
+  // --- Actions ---
+  const addTransaction = (t: Omit<Transaction, 'id' | 'date'>) => {
+    const newT: Transaction = {
+      ...t,
+      id: Math.random().toString(36).substr(2, 9),
+      date: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
+    };
+    setTransactions(prev => [newT, ...prev]);
+  };
+
+  const updateInventory = (id: string, amount: number) => {
+    setInventory(prev => prev.map(item => {
+      if (item.id === id) {
+        const newQty = item.quantity + amount;
+        return { ...item, quantity: newQty, status: newQty > 10 ? 'available' : newQty > 0 ? 'low' : 'out' };
+      }
+      return item;
+    }));
+  };
+
+  const handlePayment = (id: string, amount: number, isSupplier: boolean) => {
+    if (isSupplier) {
+      setContacts(prev => prev.map(c => c.id === id ? { ...c, balance: Math.max(0, (c.balance || 0) - amount) } : c));
+      addTransaction({ description: `سداد مورد: ${contacts.find(c => c.id === id)?.name}`, amount, type: 'expense', category: 'payment' });
+    } else {
+      setContacts(prev => prev.map(c => c.id === id ? { ...c, debt: Math.max(0, (c.debt || 0) - amount) } : c));
+      addTransaction({ description: `تحصيل دين: ${contacts.find(c => c.id === id)?.name}`, amount, type: 'income', category: 'debt' });
+    }
+  };
+
+  // --- Calculations ---
+  const dailyIncome = transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
+  const dailyExpense = transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
+  const totalDebt = contacts.filter(c => c.type === 'customer').reduce((acc, c) => acc + (c.debt || 0), 0);
+  const netValue = 1240500 + dailyIncome - dailyExpense; // Base + current session
 
   return (
     <div className="min-h-screen bg-bakery-surface text-on-surface">
       <Sidebar activeView={view} setView={setView} />
       
       <div className="lg:pr-72 min-h-screen flex flex-col">
-        <TopBar />
+        <TopBar netValue={netValue} />
         
         <main className="p-8 lg:p-12 max-w-7xl w-full mx-auto flex-1">
           <AnimatePresence mode="wait">
@@ -782,19 +921,11 @@ export default function App() {
               transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
               className="h-full"
             >
-              {view === 'dashboard' && <Dashboard />}
-              {view === 'finance' && <Finance />}
-              {view === 'contacts' && <Contacts />}
-              {view === 'inventory' && <Inventory />}
-              {view === 'reports' && (
-                <div className="h-full flex flex-col items-center justify-center p-20 text-center border border-white/5 bg-white/[0.02] rounded-[40px] border-dashed">
-                  <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mb-8 text-primary border border-white/5">
-                    <BarChart3 size={40} />
-                  </div>
-                  <h2 className="text-2xl font-light text-white mb-4 italic">التقارير التحليلية <span className="font-medium text-primary">المتقدمة</span></h2>
-                  <p className="text-white/30 text-sm max-w-md font-light">يتم حالياً تكوين مراجعات الذكاء الاصطناعي وتقارير الأداء السنوي. يرجى مراجعة الوكيل لمزيد من المعلومات.</p>
-                </div>
-              )}
+              {view === 'dashboard' && <Dashboard stats={{ netValue, dailyIncome, dailyExpense, totalDebt }} transactions={transactions} inventory={inventory} />}
+              {view === 'finance' && <Finance stats={{ dailyIncome, dailyExpense }} transactions={transactions} onAdd={addTransaction} />}
+              {view === 'contacts' && <Contacts contacts={contacts} onPay={handlePayment} />}
+              {view === 'inventory' && <Inventory inventory={inventory} onUpdate={updateInventory} />}
+              {view === 'reports' && <Reports stats={{ netValue, dailyIncome, dailyExpense, totalDebt }} transactions={transactions} contacts={contacts} inventory={inventory} />}
             </motion.div>
           </AnimatePresence>
         </main>
@@ -823,3 +954,118 @@ export default function App() {
     </div>
   );
 }
+
+const Reports = ({ stats, transactions, contacts, inventory }: any) => {
+  const inventoryValue = inventory.reduce((acc: number, item: any) => acc + (item.quantity * item.price), 0);
+  
+  return (
+    <div className="flex flex-col gap-10 animate-in slide-in-from-right-8 duration-700">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-4xl font-light text-white mb-1">الذكاء <span className="font-medium text-primary">المحاسبي والتحليلي</span></h1>
+        <p className="text-white/40 text-sm font-light italic">تحليل أداء رأس المال وكفاءة التشغيل للدورة الحالية</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="bg-surface-card p-8 rounded-[40px] border border-white/5 shadow-2xl flex flex-col justify-between group">
+          <p className="text-[10px] uppercase tracking-widest font-black text-white/30 mb-6">قيمة الأصول المتداولة</p>
+          <div className="flex items-baseline gap-2">
+            <span className="text-4xl font-black text-white tracking-tight">{formatCurrency(inventoryValue)}</span>
+          </div>
+          <div className="w-full bg-white/5 h-1 rounded-full mt-6 overflow-hidden">
+             <div className="bg-primary h-full rounded-full" style={{ width: '85%' }}></div>
+          </div>
+        </div>
+
+        <div className="bg-surface-card p-8 rounded-[40px] border border-white/5 shadow-2xl flex flex-col justify-between group">
+          <p className="text-[10px] uppercase tracking-widest font-black text-white/30 mb-6">هامش الربح التشغيلي</p>
+          <div className="flex items-baseline gap-2">
+            <span className="text-4xl font-black text-emerald-400 tracking-tight">
+              {((stats.dailyIncome - stats.dailyExpense) / (stats.dailyIncome || 1) * 100).toFixed(1)}%
+            </span>
+          </div>
+          <p className="text-[10px] text-white/20 mt-6 italic font-medium">معدل العائد على المبيعات اليومية</p>
+        </div>
+
+        <div className="bg-surface-card p-8 rounded-[40px] border border-white/5 shadow-2xl flex flex-col justify-between group opacity-60">
+          <p className="text-[10px] uppercase tracking-widest font-black text-white/30 mb-6">القيمة السوقية المتوقعة</p>
+          <div className="flex items-baseline gap-2">
+            <span className="text-4xl font-black text-white/80 tracking-tight">{formatCurrency(stats.netValue + inventoryValue)}</span>
+          </div>
+          <p className="text-[10px] text-white/20 mt-6 italic font-medium">مجموع النقد والأصول الاستراتيجية</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-10">
+        <div className="xl:col-span-8 bg-sidebar border border-white/5 rounded-[40px] shadow-2xl p-10 flex flex-col gap-10">
+          <h3 className="text-sm font-black tracking-[0.2em] text-white/80 uppercase">توزيع التدفقات المالية</h3>
+          <div className="flex-1 flex flex-col justify-center">
+             <div className="flex items-end justify-between gap-4 h-[240px] mb-6">
+                {[...Array(12)].map((_, i) => {
+                  const val = Math.random() * 100;
+                  return (
+                    <div key={i} className="flex-1 flex flex-col gap-3 group">
+                       <div className="flex-1 bg-white/5 rounded-t-2xl relative overflow-hidden flex flex-col justify-end">
+                          <motion.div 
+                            initial={{ height: 0 }}
+                            animate={{ height: `${val}%` }}
+                            transition={{ duration: 1, delay: i * 0.05 }}
+                            className={cn("w-full transition-all group-hover:opacity-80", i % 3 === 0 ? "bg-primary" : "bg-white/10")} 
+                          />
+                       </div>
+                       <span className="text-[8px] text-white/20 text-center font-bold">{i+1}M</span>
+                    </div>
+                  );
+                })}
+             </div>
+             <div className="flex gap-10 border-t border-white/5 pt-8">
+                <div className="flex items-center gap-3">
+                   <div className="w-3 h-3 rounded-full bg-primary" />
+                   <span className="text-[10px] font-black text-white/60 tracking-widest uppercase">الإيرادات الفعلية</span>
+                </div>
+                <div className="flex items-center gap-3">
+                   <div className="w-3 h-3 rounded-full bg-white/10" />
+                   <span className="text-[10px] font-black text-white/20 tracking-widest uppercase">المصروفات التشغيلية</span>
+                </div>
+             </div>
+          </div>
+        </div>
+
+        <div className="xl:col-span-4 flex flex-col gap-8">
+           <div className="bg-surface-card p-10 rounded-[40px] border border-white/5 shadow-2xl flex flex-col gap-8">
+              <h3 className="text-sm font-black tracking-[0.2em] text-white/80 uppercase leading-none">توزيع الالتزامات</h3>
+              <div className="space-y-6">
+                 <div>
+                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-white/40 mb-3 px-1">
+                       <span>ديون العملاء</span>
+                       <span className="text-white">{((stats.totalDebt / (stats.totalDebt + stats.dailyExpense)) * 100).toFixed(0)}%</span>
+                    </div>
+                    <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden">
+                       <div className="bg-red-500 h-full rounded-full" style={{ width: `${(stats.totalDebt / (stats.totalDebt + stats.dailyExpense)) * 100}%` }}></div>
+                    </div>
+                 </div>
+                 <div>
+                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-white/40 mb-3 px-1">
+                       <span>استحقاق الموردين</span>
+                       <span className="text-primary">85%</span>
+                    </div>
+                    <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden">
+                       <div className="bg-primary h-full rounded-full" style={{ width: '85%' }}></div>
+                    </div>
+                 </div>
+              </div>
+           </div>
+           
+           <div className="bg-emerald-500/10 border border-emerald-500/20 p-8 rounded-[40px] flex flex-col gap-4">
+              <div className="w-12 h-12 bg-emerald-500 text-black rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                 <TrendingUp size={24} />
+              </div>
+              <h4 className="text-lg font-bold text-emerald-400">توصية الذكاء الاصطناعي</h4>
+              <p className="text-emerald-400/60 text-xs leading-relaxed italic font-medium">
+                بناءً على الأداء الحالي، يُنصح بتوسيع المشتريات من مادة "الدقيق المتاز" لارتفاع الطلب المتوقع في الوردية القادمة بنسبة 12%.
+              </p>
+           </div>
+        </div>
+      </div>
+    </div>
+  );
+};
