@@ -1,0 +1,67 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // --- Phase 3: Primitives & Global Helpers ---
+    function isSignedIn() { return request.auth != null; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isOwner(data) { return isSignedIn() && data.userId == request.auth.uid; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    
+    // Default Deny
+    match /{document=**} { allow read, write: if false; }
+
+    // --- Transactions Rules ---
+    function isValidTransaction(data) {
+      return data.keys().hasAll(['description', 'amount', 'type', 'category', 'date', 'userId'])
+      && data.description is string && data.description.size() <= 200
+      && data.amount is number && data.amount >= 0
+      && data.type in ['income', 'expense']
+      && data.userId == request.auth.uid;
+    }
+
+    match /transactions/{transactionId} {
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isOwner(resource.data);
+      allow create: if isSignedIn() && isValidTransaction(incoming());
+      allow update: if isOwner(existing()) && isValidTransaction(incoming())
+                    && incoming().userId == existing().userId; // Immutable Owner
+      allow delete: if isOwner(existing());
+    }
+
+    // --- Contacts Rules ---
+    function isValidContact(data) {
+      return data.keys().hasAll(['name', 'type', 'userId'])
+      && data.name is string && data.name.size() <= 100
+      && data.type in ['customer', 'supplier']
+      && data.userId == request.auth.uid;
+    }
+
+    match /contacts/{contactId} {
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isOwner(resource.data);
+      allow create: if isSignedIn() && isValidContact(incoming());
+      allow update: if isOwner(existing()) && isValidContact(incoming())
+                    && incoming().userId == existing().userId;
+      allow delete: if isOwner(existing());
+    }
+
+    // --- Inventory Rules ---
+    function isValidInventory(data) {
+      return data.keys().hasAll(['name', 'quantity', 'price', 'userId'])
+      && data.name is string && data.name.size() <= 100
+      && data.quantity is number && data.quantity >= 0
+      && data.price is number && data.price >= 0
+      && data.userId == request.auth.uid;
+    }
+
+    match /inventory/{itemId} {
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isOwner(resource.data);
+      allow create: if isSignedIn() && isValidInventory(incoming());
+      allow update: if isOwner(existing()) && isValidInventory(incoming())
+                    && incoming().userId == existing().userId;
+      allow delete: if isOwner(existing());
+    }
+  }
+}

@@ -39,6 +39,67 @@ import {
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, formatCurrency } from './lib/utils';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, User } from 'firebase/auth';
+import { 
+  getFirestore, 
+  collection, 
+  onSnapshot, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  query, 
+  where, 
+  limit, 
+  orderBy,
+  getDocFromServer
+} from 'firebase/firestore';
+import firebaseConfig from '../firebase-applet-config.json';
+
+// --- Firebase Initialization ---
+const app = initializeApp(firebaseConfig);
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export const auth = getAuth(app);
+const googleProvider = new GoogleAuthProvider();
+
+// --- Error Handling ---
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
 
 // --- Types ---
 type View = 'dashboard' | 'finance' | 'contacts' | 'inventory' | 'reports';
@@ -64,7 +125,7 @@ interface InventoryItem {
 
 // --- Components ---
 
-const Sidebar = ({ activeView, setView }: { activeView: View, setView: (v: View) => void }) => {
+const Sidebar = ({ activeView, setView, user }: { activeView: View, setView: (v: View) => void, user: User }) => {
   const navItems = [
     { id: 'dashboard', label: 'الرئيسية', icon: LayoutDashboard },
     { id: 'finance', label: 'المالية', icon: Wallet },
@@ -109,23 +170,28 @@ const Sidebar = ({ activeView, setView }: { activeView: View, setView: (v: View)
       </nav>
 
       <div className="mt-auto flex flex-col gap-4">
-        <button 
-          onClick={() => {
-            if (confirm('هل أنت متأكد من مسح جميع البيانات؟')) {
-              localStorage.clear();
-              window.location.reload();
-            }
-          }}
-          className="text-[10px] text-white/20 hover:text-red-400 transition-colors uppercase tracking-widest font-black"
-        >
-          إعادة ضبط جميع البيانات
-        </button>
-        <div className="p-6 bg-white/5 rounded-3xl border border-white/5 backdrop-blur-sm">
-          <p className="text-xs text-white/40 mb-1 font-light italic">الدعم المتميز</p>
-          <p className="text-sm mb-4 font-medium text-white/90">تحتاج إلى مساعدة؟</p>
-          <button className="w-full py-2.5 bg-primary text-black text-xs font-bold rounded-xl hover:bg-primary/90 transition-all shadow-lg shadow-primary/10 active:scale-95">
-            اتصل بالوكيل
-          </button>
+        <div className="flex items-center gap-3 p-4 bg-white/5 rounded-2xl border border-white/5 overflow-hidden">
+          {user.photoURL ? (
+            <img src={user.photoURL} alt={user.displayName || ""} className="w-8 h-8 rounded-full" />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-black font-bold">
+              {user.displayName?.[0] || 'U'}
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-bold text-white truncate">{user.displayName}</p>
+            <button 
+              onClick={() => signOut(auth)}
+              className="text-[10px] text-white/40 hover:text-red-400 transition-colors flex items-center gap-1"
+            >
+              <LogOut size={10} />
+              تسجيل الخروج
+            </button>
+          </div>
+        </div>
+        <div className="p-6 bg-white/5 rounded-3xl border border-white/5 backdrop-blur-sm text-center">
+          <p className="text-[10px] text-white/40 mb-1 font-light italic">الحساب المربوط</p>
+          <p className="text-[10px] mb-0 font-medium text-white/90 truncate">{user.email}</p>
         </div>
       </div>
     </aside>
@@ -940,180 +1006,338 @@ const Inventory = ({ inventory, onUpdate }: any) => {
   );
 };
 
+const Login = () => {
+  const [loading, setLoading] = React.useState(false);
+
+  const handleLogin = async () => {
+    setLoading(true);
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      console.error("Login failed:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-bakery-surface flex items-center justify-center p-6 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent overflow-hidden relative">
+      <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 blur-[120px] rounded-full -translate-y-1/2 translate-x-1/2"></div>
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-primary/2 blur-[120px] rounded-full translate-y-1/2 -translate-x-1/2"></div>
+
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-md bg-sidebar/50 backdrop-blur-3xl border border-white/5 rounded-[48px] p-12 shadow-2xl relative z-10"
+      >
+        <div className="flex flex-col items-center text-center mb-12">
+          <div className="w-20 h-20 bg-primary rounded-3xl flex items-center justify-center text-black font-black text-4xl mb-8 shadow-2xl shadow-primary/20 rotate-3 group hover:rotate-0 transition-transform duration-500">
+            L
+          </div>
+          <h1 className="text-4xl font-light text-white mb-2 leading-tight">نظام <span className="font-bold text-primary">لوكسوريا</span></h1>
+          <p className="text-white/30 text-sm font-light italic tracking-wide">الإدارة الذكية والمستدامة للمخابز الحديثة</p>
+        </div>
+
+        <div className="space-y-6">
+          <button 
+            onClick={handleLogin}
+            disabled={loading}
+            className="w-full bg-white text-black py-5 rounded-[24px] font-black text-xs uppercase tracking-widest flex items-center justify-center gap-4 hover:bg-white/90 transition-all shadow-xl disabled:opacity-50 group overflow-hidden relative"
+          >
+            {loading ? (
+              <div className="w-5 h-5 border-2 border-black/20 border-t-black rounded-full animate-spin" />
+            ) : (
+              <>
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+                  <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                دخول عبر حساب جوجل
+              </>
+            )}
+            <div className="absolute inset-0 bg-primary/10 translate-y-full group-hover:translate-y-0 transition-transform" />
+          </button>
+          
+          <div className="flex items-center gap-4 px-4 py-8">
+            <div className="flex-1 h-px bg-white/5"></div>
+            <span className="text-[10px] text-white/10 uppercase font-black tracking-[0.2em]">التوثيق السحابي</span>
+            <div className="flex-1 h-px bg-white/5"></div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+             <div className="p-6 bg-white/[0.02] border border-white/5 rounded-3xl text-center">
+                <p className="text-xl font-bold text-white mb-1">100%</p>
+                <p className="text-[8px] text-white/20 uppercase font-black tracking-widest">أمان البيانات</p>
+             </div>
+             <div className="p-6 bg-white/[0.02] border border-white/5 rounded-3xl text-center">
+                <p className="text-xl font-bold text-white mb-1">Live</p>
+                <p className="text-[8px] text-white/20 uppercase font-black tracking-widest">مزامنة فورية</p>
+             </div>
+          </div>
+        </div>
+        
+        <p className="mt-12 text-[10px] text-white/20 text-center font-light uppercase tracking-widest italic flex items-center justify-center gap-2">
+          جميع الحقوق محفوظة © {new Date().getFullYear()} لوكسوريا سيستم
+        </p>
+      </motion.div>
+    </div>
+  );
+};
+
 export default function App() {
+
+  const [user, setUser] = React.useState<User | null>(null);
+  const [authReady, setAuthReady] = React.useState(false);
   const [view, setView] = React.useState<View>('dashboard');
-  
-  // --- Global State ---
-  const [transactions, setTransactions] = React.useState<Transaction[]>(() => {
-    const saved = localStorage.getItem('luxuria_transactions');
-    return saved ? JSON.parse(saved) : [
-      { id: '1', date: '14:30 م', description: 'مبيعات وردية الصباح', amount: 12000, type: 'income', category: 'sales' },
-      { id: '2', date: '09:15 ص', description: 'مبيعات وردية الصباح', amount: 10000, type: 'income', category: 'sales' },
-      { id: '3', date: 'أمس', description: 'شراء دقيق ممتاز', amount: 45000, type: 'expense', category: 'inventory' },
-    ];
-  });
-
-  const ICON_MAP: Record<string, React.ElementType> = { Wheat, Beaker, Droplets, Fuel };
-
-  const [inventory, setInventory] = React.useState<InventoryItem[]>(() => {
-    const saved = localStorage.getItem('luxuria_inventory');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      return parsed.map((item: any) => ({
-        ...item,
-        icon: ICON_MAP[item.iconName] || Package
-      }));
-    }
-    return [
-      { id: '1', name: 'دقيق قمح ممتاز', quantity: 120, unit: 'جوال', price: 18500, status: 'available', icon: Wheat, iconName: 'Wheat' } as any,
-      { id: '2', name: 'خميرة فورية', quantity: 2, unit: 'كرتونة', price: 45000, status: 'low', icon: Beaker, iconName: 'Beaker' } as any,
-      { id: '3', name: 'سكر أبيض', quantity: 45, unit: 'جوال', price: 32000, status: 'available', icon: Droplets, iconName: 'Droplets' } as any,
-      { id: '4', name: 'وقود (ديزل)', quantity: 850, unit: 'لتر', price: 1150, status: 'available', icon: Fuel, iconName: 'Fuel' } as any,
-    ];
-  });
-
-  const [contacts, setContacts] = React.useState(() => {
-    const saved = localStorage.getItem('luxuria_contacts');
-    const defaultContacts = [
-      { id: '1', name: 'أحمد محمد', date: '12 أكتوبر', debt: 15000, initial: 'أ', color: 'bg-primary', type: 'customer', history: [] },
-      { id: '2', name: 'بقالة النور', date: '10 أكتوبر', debt: 22500, initial: 'ب', color: 'bg-primary/40', type: 'customer', history: [] },
-      { id: '3', name: 'مطعم الأمل', date: '05 أكتوبر', debt: 7700, initial: 'م', color: 'bg-white/10', type: 'customer', history: [] },
-      { id: '4', name: 'مطاحن الدقيق الوطنية', cat: 'دقيق ومخبوزات', balance: 85000, date: '01 أكتوبر', type: 'supplier', history: [] },
-      { id: '5', name: 'شركة الوقود الحديثة', cat: 'غاز الديزل', balance: 32000, date: '28 سبتمبر', type: 'supplier', history: [] },
-    ];
-    return saved ? JSON.parse(saved) : defaultContacts;
-  });
-
-  // --- Persistence Effects ---
-  React.useEffect(() => {
-    localStorage.setItem('luxuria_transactions', JSON.stringify(transactions));
-  }, [transactions]);
+  const [transactions, setTransactions] = React.useState<Transaction[]>([]);
+  const [contacts, setContacts] = React.useState<any[]>([]);
+  const [inventory, setInventory] = React.useState<any[]>([]);
+  const [loadingData, setLoadingData] = React.useState(true);
 
   React.useEffect(() => {
-    const dataToSave = inventory.map(({ icon, ...rest }: any) => rest);
-    localStorage.setItem('luxuria_inventory', JSON.stringify(dataToSave));
-  }, [inventory]);
-
-  React.useEffect(() => {
-    localStorage.setItem('luxuria_contacts', JSON.stringify(contacts));
-  }, [contacts]);
-
-  // --- Actions ---
-  const addTransaction = (t: Omit<Transaction, 'id' | 'date'>) => {
-    const newT: Transaction = {
-      ...t,
-      id: Math.random().toString(36).substr(2, 9),
-      date: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
-    };
-    setTransactions(prev => [newT, ...prev]);
-  };
-
-  const updateInventory = (id: string, amount: number, cost?: number) => {
-    const itemName = inventory.find(i => i.id === id)?.name;
-
-    setInventory(prev => prev.map(item => {
-      if (item.id === id) {
-        const newQty = Math.max(0, item.quantity + amount);
-        const updatedItem = { 
-          ...item, 
-          quantity: newQty, 
-          status: newQty > 10 ? 'available' : newQty > 0 ? 'low' : 'out' 
-        } as any;
-        
-        // تحديث السعر فقط في حالة التوريد الجديد وبمبلغ صحيح
-        if (cost && amount > 0) {
-          updatedItem.price = cost / amount;
-        }
-        
-        return updatedItem;
+    const unsubscribeAuth = onAuthStateChanged(auth, async (u) => {
+      setUser(u);
+      setAuthReady(true);
+      
+      if (!u) {
+        setLoadingData(false);
       }
-      return item;
-    }));
+    });
+    return unsubscribeAuth;
+  }, []);
+
+  React.useEffect(() => {
+    if (!user) return;
+
+    setLoadingData(true);
     
-    if (cost && cost > 0) {
-      addTransaction({ 
-        description: `توريد مواد: ${itemName}`, 
-        amount: cost, 
-        type: 'expense', 
-        category: 'inventory' 
+    const transactionsQuery = query(
+      collection(db, 'transactions'),
+      where('userId', '==', user.uid),
+      orderBy('date', 'desc')
+    );
+
+    const unsubscribeTransactions = onSnapshot(transactionsQuery, (snapshot) => {
+      setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
+      setLoadingData(false);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'transactions'));
+
+    const contactsQuery = query(
+      collection(db, 'contacts'),
+      where('userId', '==', user.uid)
+    );
+
+    const unsubscribeContacts = onSnapshot(contactsQuery, (snapshot) => {
+      if (snapshot.empty) {
+        // Seed default contacts if empty
+        const defaultContacts = [
+          { name: 'أحمد محمد', date: '12 أكتوبر', debt: 15000, initial: 'أ', color: 'bg-primary', type: 'customer', history: [], userId: user.uid },
+          { name: 'بقالة النور', date: '10 أكتوبر', debt: 22500, initial: 'ب', color: 'bg-primary/40', type: 'customer', history: [], userId: user.uid },
+          { name: 'مطعم الأمل', date: '05 أكتوبر', debt: 7700, initial: 'م', color: 'bg-white/10', type: 'customer', history: [], userId: user.uid },
+          { name: 'مطاحن الدقيق الوطنية', cat: 'دقيق ومخبوزات', balance: 85000, date: '01 أكتوبر', type: 'supplier', history: [], userId: user.uid },
+          { name: 'شركة الوقود الحديثة', cat: 'غاز الديزل', balance: 32000, date: '28 سبتمبر', type: 'supplier', history: [], userId: user.uid },
+        ];
+        defaultContacts.forEach(c => addDoc(collection(db, 'contacts'), c));
+      } else {
+        setContacts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
+      }
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'contacts'));
+
+    const inventoryQuery = query(
+      collection(db, 'inventory'),
+      where('userId', '==', user.uid)
+    );
+
+    const unsubscribeInventory = onSnapshot(inventoryQuery, (snapshot) => {
+      if (snapshot.empty) {
+        // Seed default inventory if empty
+        const defaultInventory = [
+          { name: 'دقيق ممتاز', quantity: 250, price: 125, unit: 'جوال', status: 'available', iconName: 'Wheat', category: 'raw', userId: user.uid },
+          { name: 'خميرة فورية', quantity: 15, price: 450, unit: 'عبوة', status: 'low', iconName: 'Beaker', category: 'raw', userId: user.uid },
+          { name: 'زيت طعام', quantity: 45, price: 850, unit: 'لتر', status: 'available', iconName: 'Droplets', category: 'raw', userId: user.uid },
+          { name: 'ديزل مولد نماء', quantity: 8, price: 650, unit: 'جالون', status: 'low', iconName: 'Fuel', category: 'energy', userId: user.uid },
+        ];
+        defaultInventory.forEach(item => addDoc(collection(db, 'inventory'), item));
+      } else {
+        const iconMap: Record<string, any> = { Wheat, Beaker, Droplets, Fuel };
+        setInventory(snapshot.docs.map(doc => {
+          const data = doc.data();
+          return { 
+            id: doc.id, 
+            ...data, 
+            icon: iconMap[data.iconName] || Package 
+          };
+        }));
+      }
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'inventory'));
+
+    return () => {
+      unsubscribeTransactions();
+      unsubscribeContacts();
+      unsubscribeInventory();
+    };
+  }, [user]);
+
+  const addTransaction = async (data: Omit<Transaction, 'id' | 'date'>) => {
+    if (!user) return;
+    const date = new Date().toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' }) + ' ' + new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+    try {
+      await addDoc(collection(db, 'transactions'), {
+        ...data,
+        date,
+        userId: user.uid
       });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'transactions');
     }
   };
 
-  const handlePayment = (id: string, amount: number, isSupplier: boolean) => {
+  const updateInventory = async (id: string, amount: number, cost?: number) => {
+    if (!user) return;
+    const item = inventory.find(i => i.id === id);
+    if (!item) return;
+
+    const newQty = Math.max(0, item.quantity + amount);
+    const updates: any = {
+      quantity: newQty,
+      status: newQty > 10 ? 'available' : newQty > 0 ? 'low' : 'out'
+    };
+
+    if (cost && amount > 0) {
+      updates.price = cost / amount;
+    }
+
+    try {
+      await updateDoc(doc(db, 'inventory', id), updates);
+      
+      if (cost && cost > 0) {
+        addTransaction({ 
+          description: `توريد مواد: ${item.name}`, 
+          amount: cost, 
+          type: 'expense', 
+          category: 'inventory' 
+        });
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `inventory/${id}`);
+    }
+  };
+
+  const handlePayment = async (id: string, amount: number, isSupplier: boolean) => {
+    if (!user) return;
+    const contact = contacts.find(c => c.id === id);
+    if (!contact) return;
+
     const date = new Date().toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' }) + ' ' + new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
     
     if (isSupplier) {
-      setContacts(prev => prev.map(c => {
-        if (c.id === id) {
-          const newHistory = [...(c.history || []), { date, description: 'دفع مبلغ للمورد', amount: -amount, balance: (c.balance || 0) - amount }];
-          return { ...c, balance: Math.max(0, (c.balance || 0) - amount), history: newHistory };
-        }
-        return c;
-      }));
-      addTransaction({ description: `سداد مورد: ${contacts.find(c => c.id === id)?.name}`, amount, type: 'expense', category: 'payment' });
+      const newHistory = [...(contact.history || []), { date, description: 'دفع مبلغ للمورد', amount: -amount, balance: (contact.balance || 0) - amount }];
+      try {
+        await updateDoc(doc(db, 'contacts', id), {
+          balance: Math.max(0, (contact.balance || 0) - amount),
+          history: newHistory
+        });
+        addTransaction({ description: `سداد مورد: ${contact.name}`, amount, type: 'expense', category: 'payment' });
+      } catch (error) {
+        handleFirestoreError(error, OperationType.UPDATE, `contacts/${id}`);
+      }
     } else {
-      setContacts(prev => prev.map(c => {
-        if (c.id === id) {
-          const newHistory = [...(c.history || []), { date, description: 'تحصيل مبلغ من العميل', amount: -amount, balance: (c.debt || 0) - amount }];
-          return { ...c, debt: Math.max(0, (c.debt || 0) - amount), history: newHistory };
-        }
-        return c;
-      }));
-      addTransaction({ description: `تحصيل دين: ${contacts.find(c => c.id === id)?.name}`, amount, type: 'income', category: 'debt' });
+      const newHistory = [...(contact.history || []), { date, description: 'تحصيل مبلغ من العميل', amount: -amount, balance: (contact.debt || 0) - amount }];
+      try {
+        await updateDoc(doc(db, 'contacts', id), {
+          debt: Math.max(0, (contact.debt || 0) - amount),
+          history: newHistory
+        });
+        addTransaction({ description: `تحصيل دين: ${contact.name}`, amount, type: 'income', category: 'debt' });
+      } catch (error) {
+        handleFirestoreError(error, OperationType.UPDATE, `contacts/${id}`);
+      }
     }
   };
 
-  const updateTransaction = (id: string, updates: Partial<Transaction>) => {
-    setTransactions(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+  const updateTransaction = async (id: string, updates: Partial<Transaction>) => {
+    try {
+      await updateDoc(doc(db, 'transactions', id), updates);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `transactions/${id}`);
+    }
   };
 
-  const deleteTransaction = (id: string) => {
-    setTransactions(prev => prev.filter(t => t.id !== id));
+  const deleteTransaction = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'transactions', id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `transactions/${id}`);
+    }
   };
 
   // --- Calculations ---
   const dailyIncome = transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
   const dailyExpense = transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
   const totalDebt = contacts.filter(c => c.type === 'customer').reduce((acc, c) => acc + (c.debt || 0), 0);
-  const netValue = 1240500 + dailyIncome - dailyExpense; // Base + current session
+  const netValue = (dailyIncome - dailyExpense) + totalDebt;
+
+  if (!authReady) {
+    return (
+      <div className="min-h-screen bg-bakery-surface flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Login />;
+  }
 
   return (
-    <div className="min-h-screen bg-bakery-surface text-on-surface">
-      <Sidebar activeView={view} setView={setView} />
+    <div className="min-h-screen bg-bakery-surface text-right font-sans" dir="rtl">
+      <Sidebar activeView={view} setView={setView} user={user} />
       
       <div className="lg:pr-72 min-h-screen flex flex-col">
         <TopBar netValue={netValue} />
         
-        <main className="p-8 lg:p-12 max-w-7xl w-full mx-auto flex-1">
+        <main className="flex-1 p-6 lg:p-12 pb-24 overflow-hidden">
           <AnimatePresence mode="wait">
             <motion.div
               key={view}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-              className="h-full"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 1.02 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
+              className="max-w-[1600px] mx-auto"
             >
-              {view === 'dashboard' && <Dashboard stats={{ netValue, dailyIncome, dailyExpense, totalDebt }} transactions={transactions} inventory={inventory} />}
-              {view === 'finance' && <Finance stats={{ dailyIncome, dailyExpense }} transactions={transactions} onAdd={addTransaction} />}
-              {view === 'contacts' && <Contacts contacts={contacts} onPay={handlePayment} />}
-              {view === 'inventory' && <Inventory inventory={inventory} onUpdate={updateInventory} />}
-              {view === 'reports' && (
-                <Reports 
-                  transactions={transactions} 
-                  inventory={inventory} 
-                  onEditTransaction={updateTransaction} 
-                  onDeleteTransaction={deleteTransaction}
-                />
+              {loadingData ? (
+                <div className="h-[60vh] flex items-center justify-center">
+                  <div className="flex flex-col items-center gap-4">
+                     <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+                     <p className="text-white/20 text-xs font-black uppercase tracking-widest">جاري مزامنة البيانات السحابية...</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {view === 'dashboard' && <Dashboard stats={{ netValue, dailyIncome, dailyExpense, totalDebt }} transactions={transactions} inventory={inventory} />}
+                  {view === 'finance' && <Finance stats={{ dailyIncome, dailyExpense }} transactions={transactions} onAdd={addTransaction} />}
+                  {view === 'contacts' && <Contacts contacts={contacts} onPay={handlePayment} />}
+                  {view === 'inventory' && <Inventory inventory={inventory} onUpdate={updateInventory} />}
+                  {view === 'reports' && (
+                    <Reports 
+                      transactions={transactions} 
+                      inventory={inventory} 
+                      onEditTransaction={updateTransaction} 
+                      onDeleteTransaction={deleteTransaction}
+                    />
+                  )}
+                </>
               )}
             </motion.div>
           </AnimatePresence>
         </main>
       </div>
 
-      {/* Mobile Bottom Nav */}
-      <nav className="lg:hidden fixed bottom-6 left-6 right-6 h-20 bg-sidebar/80 border border-white/5 shadow-2xl rounded-[32px] flex items-center justify-around px-4 z-50 backdrop-blur-xl">
+      {/* Mobile Navigation */}
+      <nav className="lg:hidden fixed bottom-6 left-6 right-6 h-20 bg-sidebar/80 backdrop-blur-2xl border border-white/5 rounded-[32px] flex items-center justify-around px-4 z-40 shadow-2xl">
         {[
           { id: 'dashboard', icon: LayoutDashboard },
           { id: 'finance', icon: Wallet },
@@ -1125,11 +1349,11 @@ export default function App() {
             key={item.id}
             onClick={() => setView(item.id as View)}
             className={cn(
-              "p-4 rounded-full transition-all duration-300",
-              view === item.id ? "bg-primary text-black -translate-y-6 shadow-[0_15px_30px_rgba(197,160,89,0.3)] scale-110" : "text-white/40"
+              "w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300",
+              view === item.id ? "bg-primary text-black scale-110 shadow-lg shadow-primary/20" : "text-white/30"
             )}
           >
-            <item.icon size={22} />
+            <item.icon size={20} />
           </button>
         ))}
       </nav>
@@ -1147,9 +1371,9 @@ const Reports = ({ transactions, inventory, onEditTransaction, onDeleteTransacti
     setEditForm({ description: t.description, amount: t.amount.toString() });
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (editingTransaction) {
-      onEditTransaction(editingTransaction.id, {
+      await onEditTransaction(editingTransaction.id, {
         description: editForm.description,
         amount: parseFloat(editForm.amount)
       });
@@ -1159,7 +1383,6 @@ const Reports = ({ transactions, inventory, onEditTransaction, onDeleteTransacti
 
   const filteredTransactions = transactions.filter((t: any) => {
     if (range === 'all') return true;
-    // في بيئة حقيقية سنستخدم تواريخ فعلية، هنا سنحاكي الفلترة بناءً على عدد الحركات
     const idx = transactions.indexOf(t);
     if (range === 'day') return idx < 5;
     if (range === 'week') return idx < 20;
@@ -1236,7 +1459,6 @@ const Reports = ({ transactions, inventory, onEditTransaction, onDeleteTransacti
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-10">
-        {/* Income Details Card */}
         <div className="bg-sidebar border border-white/5 rounded-[40px] shadow-2xl overflow-hidden flex flex-col">
           <div className="p-8 border-b border-white/5 bg-primary/5 flex justify-between items-center">
             <div className="flex items-center gap-3">
@@ -1281,7 +1503,6 @@ const Reports = ({ transactions, inventory, onEditTransaction, onDeleteTransacti
           </div>
         </div>
 
-        {/* Expense Details Card */}
         <div className="bg-sidebar border border-white/5 rounded-[40px] shadow-2xl overflow-hidden flex flex-col">
           <div className="p-8 border-b border-white/5 bg-red-500/5 flex justify-between items-center">
             <div className="flex items-center gap-3">
@@ -1327,7 +1548,6 @@ const Reports = ({ transactions, inventory, onEditTransaction, onDeleteTransacti
         </div>
       </div>
       
-      {/* قسم إضافي لتحليل الأصول */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
          <div className="bg-surface-card p-10 rounded-[40px] border border-white/5 shadow-2xl flex items-center justify-between group">
             <div>
@@ -1349,63 +1569,49 @@ const Reports = ({ transactions, inventory, onEditTransaction, onDeleteTransacti
          </div>
       </div>
 
-      {/* Edit Transaction Modal */}
       <AnimatePresence>
         {editingTransaction && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 sm:p-24 bg-black/80 backdrop-blur-sm">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[100] flex items-center justify-center p-6">
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               className="bg-sidebar w-full max-w-sm rounded-[40px] border border-white/10 p-10 flex flex-col gap-6 shadow-2xl"
             >
-              <h3 className="text-xl font-bold text-white text-center">تعديل العملية</h3>
-              
+              <h3 className="text-xl font-bold text-white text-center">تعديل قيد مالي</h3>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] uppercase font-black tracking-widest text-white/30 px-2 block">الوصف</label>
+                  <label className="text-[10px] uppercase font-black tracking-widest text-white/30 px-2 block text-right">الوصف</label>
                   <input 
-                    type="text"
                     value={editForm.description}
                     onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
                     className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-right font-bold outline-none focus:ring-2 focus:ring-primary/20"
-                    placeholder="وصف العملية"
                   />
                 </div>
-                
                 <div className="space-y-2">
-                  <label className="text-[10px] uppercase font-black tracking-widest text-white/30 px-2 block">المبلغ</label>
+                  <label className="text-[10px] uppercase font-black tracking-widest text-white/30 px-2 block text-right">المبلغ</label>
                   <input 
                     type="number"
                     value={editForm.amount}
                     onChange={(e) => setEditForm(prev => ({ ...prev, amount: e.target.value }))}
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-center font-black text-2xl outline-none focus:ring-2 focus:ring-primary/20"
-                    placeholder="0.00"
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-right font-bold outline-none focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
-
-                <div className="grid grid-cols-1 gap-4 mt-6">
-                  <button 
-                    onClick={handleSaveEdit} 
-                    className="py-4 bg-primary text-black rounded-2xl font-black hover:bg-primary/90 transition-all text-xs uppercase tracking-widest"
-                  >
-                    حفظ التعديلات
-                  </button>
-                  <div className="flex gap-4">
-                    <button onClick={() => setEditingTransaction(null)} className="flex-1 py-4 bg-white/5 text-white/60 rounded-2xl font-bold hover:bg-white/10 transition-all text-xs uppercase tracking-widest">إلغاء</button>
-                    <button 
-                      onClick={() => {
-                        if (confirm('هل أنت متأكد من حذف هذه العملية؟')) {
-                          onDeleteTransaction(editingTransaction.id);
-                          setEditingTransaction(null);
-                        }
-                      }} 
-                      className="flex-1 py-4 bg-red-500/10 text-red-500 rounded-2xl font-bold hover:bg-red-500/20 transition-all text-xs uppercase tracking-widest border border-red-500/20"
-                    >
-                      حذف
-                    </button>
-                  </div>
+                <div className="grid grid-cols-2 gap-4 mt-4">
+                  <button onClick={() => setEditingTransaction(null)} className="py-4 bg-white/5 text-white rounded-2xl font-bold hover:bg-white/10 transition-all text-sm uppercase tracking-widest">إلغاء</button>
+                  <button onClick={handleSaveEdit} className="py-4 bg-primary text-black rounded-2xl font-bold hover:bg-primary/90 transition-all text-sm uppercase tracking-widest">حفظ</button>
                 </div>
+                <button 
+                  onClick={() => {
+                    if (confirm('هل أنت متأكد من حذف هذا القيد؟')) {
+                      onDeleteTransaction(editingTransaction.id);
+                      setEditingTransaction(null);
+                    }
+                  }}
+                  className="w-full py-3 text-red-400 text-[10px] font-black uppercase tracking-widest hover:text-red-300 transition-colors"
+                >
+                  حذف القيد نهائياً
+                </button>
               </div>
             </motion.div>
           </div>

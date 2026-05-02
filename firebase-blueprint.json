@@ -1,0 +1,65 @@
+{
+  "entities": {
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Financial records of income and expenses",
+      "type": "object",
+      "properties": {
+        "description": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "type": "string", "enum": ["income", "expense"] },
+        "category": { "type": "string" },
+        "date": { "type": "string" },
+        "userId": { "type": "string" }
+      },
+      "required": ["description", "amount", "type", "category", "date", "userId"]
+    },
+    "Contact": {
+      "title": "Contact",
+      "description": "Customers and suppliers",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "date": { "type": "string" },
+        "debt": { "type": "number" },
+        "balance": { "type": "number" },
+        "initial": { "type": "string" },
+        "color": { "type": "string" },
+        "type": { "type": "string", "enum": ["customer", "supplier"] },
+        "history": { "type": "array" },
+        "userId": { "type": "string" }
+      },
+      "required": ["name", "type", "userId"]
+    },
+    "InventoryItem": {
+      "title": "Inventory Item",
+      "description": "Materials and stocks",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "quantity": { "type": "number" },
+        "price": { "type": "number" },
+        "unit": { "type": "string" },
+        "iconName": { "type": "string" },
+        "status": { "type": "string" },
+        "category": { "type": "string" },
+        "userId": { "type": "string" }
+      },
+      "required": ["name", "quantity", "price", "userId"]
+    }
+  },
+  "firestore": {
+    "transactions": {
+      "schema": "Transaction",
+      "description": "Global transactions list"
+    },
+    "contacts": {
+      "schema": "Contact",
+      "description": "Global contacts list"
+    },
+    "inventory": {
+      "schema": "InventoryItem",
+      "description": "Global inventory list"
+    }
+  }
+}
