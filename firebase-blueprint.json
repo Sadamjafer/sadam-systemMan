@@ -43,6 +43,7 @@
         "iconName": { "type": "string" },
         "status": { "type": "string" },
         "category": { "type": "string" },
+        "history": { "type": "array" },
         "userId": { "type": "string" }
       },
       "required": ["name", "quantity", "price", "userId"]

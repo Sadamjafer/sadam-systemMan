@@ -25,7 +25,9 @@ import {
   MoreVertical,
   Search,
   Filter,
-  LogOut
+  LogOut,
+  Check,
+  X
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -558,10 +560,18 @@ const Finance = ({ stats, transactions, onAdd }: any) => {
   );
 };
 
-const Contacts = ({ contacts, onPay }: { contacts: any[], onPay: (id: string, amount: number, isSupplier: boolean) => void }) => {
+const Contacts = ({ contacts, onPay, onAdd, onDelete }: { 
+  contacts: any[], 
+  onPay: (id: string, amount: number, isSupplier: boolean) => void,
+  onAdd: (contact: any) => void,
+  onDelete: (id: string) => void
+}) => {
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [historyId, setHistoryId] = React.useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = React.useState<string | null>(null);
   const [amount, setAmount] = React.useState('');
+  const [showAddModal, setShowAddModal] = React.useState(false);
+  const [newContact, setNewContact] = React.useState({ name: '', type: 'customer', debt: 0, balance: 0 });
 
   const handlePay = () => {
     if (!selectedId || !amount) return;
@@ -571,13 +581,41 @@ const Contacts = ({ contacts, onPay }: { contacts: any[], onPay: (id: string, am
     setAmount('');
   };
 
+  const handleAdd = () => {
+    if (!newContact.name) return;
+    const initial = newContact.name[0];
+    const colors = ['bg-primary', 'bg-emerald-500', 'bg-red-500', 'bg-blue-500', 'bg-purple-500'];
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    
+    onAdd({
+      ...newContact,
+      initial,
+      color,
+      date: new Date().toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' }),
+      debt: parseFloat(newContact.debt.toString()) || 0,
+       balance: parseFloat(newContact.balance.toString()) || 0
+    });
+    
+    setShowAddModal(false);
+    setNewContact({ name: '', type: 'customer', debt: 0, balance: 0 });
+  };
+
   const selectedForHistory = contacts.find(c => c.id === historyId);
 
   return (
     <div className="flex flex-col gap-10 animate-in slide-in-from-left-8 duration-700">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-4xl font-light text-white mb-1">إدارة <span className="font-medium text-primary">العلاقات الاستراتيجية</span></h1>
-        <p className="text-white/40 text-sm font-light italic">متابعة الأرصدة المتبادلة مع العملاء والموردين المعتمدين</p>
+      <div className="flex flex-col sm:flex-row justify-between items-end gap-6">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-4xl font-light text-white mb-1">إدارة <span className="font-medium text-primary">العلاقات الاستراتيجية</span></h1>
+          <p className="text-white/40 text-sm font-light italic">متابعة الأرصدة المتبادلة مع العملاء والموردين المعتمدين</p>
+        </div>
+        <button 
+          onClick={() => setShowAddModal(true)}
+          className="bg-primary text-black px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-3 hover:bg-primary/90 transition-all shadow-xl shadow-primary/10"
+        >
+          <PlusCircle size={18} />
+          إضافة جهة اتصال
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -638,7 +676,7 @@ const Contacts = ({ contacts, onPay }: { contacts: any[], onPay: (id: string, am
                 <tr>
                   <th className="py-6 px-10">هوية العميل</th>
                   <th className="py-6 px-10">إجمالي الدين</th>
-                  <th className="py-6 px-10 text-center">إجراء</th>
+                  <th className="py-6 px-10 text-center">إجراءات</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.03]">
@@ -660,7 +698,21 @@ const Contacts = ({ contacts, onPay }: { contacts: any[], onPay: (id: string, am
                     </td>
                     <td className="py-6 px-10 font-black text-red-400 tracking-tight">{formatCurrency(c.debt)}</td>
                     <td className="py-6 px-10 text-center">
-                      <button onClick={() => setSelectedId(c.id)} className="p-3 text-white/20 hover:text-primary transition-all rounded-xl hover:bg-white/5"><Wallet size={18} /></button>
+                      <div className="flex items-center justify-center gap-2">
+                        {deleteConfirmId === c.id ? (
+                          <div className="flex items-center gap-1 bg-red-500/10 rounded-xl p-1 border border-red-500/20">
+                            <button onClick={() => { onDelete(c.id); setDeleteConfirmId(null); }} className="p-2 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-all" title="تأكيد الحذف"><Check size={14} /></button>
+                            <button onClick={() => setDeleteConfirmId(null)} className="p-2 text-white/40 hover:text-white rounded-lg transition-all" title="إلغاء"><X size={14} /></button>
+                          </div>
+                        ) : (
+                          <>
+                            <button onClick={() => setSelectedId(c.id)} className="p-3 text-white/20 hover:text-primary transition-all rounded-xl hover:bg-white/5" title="تحصيل مبلغ"><Wallet size={18} /></button>
+                            <button onClick={() => setDeleteConfirmId(c.id)} className="p-3 text-white/20 hover:text-red-500 transition-all rounded-xl hover:bg-white/5" title="حذف">
+                              <TrendingDown size={14} className="rotate-45" />✕
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -699,9 +751,21 @@ const Contacts = ({ contacts, onPay }: { contacts: any[], onPay: (id: string, am
                     </td>
                     <td className="py-6 px-10 font-black text-primary tracking-tight">{formatCurrency(s.balance || 0)}</td>
                     <td className="py-6 px-10 text-center">
-                      <button onClick={() => setSelectedId(s.id)} className="bg-white/5 text-white/60 border border-white/10 hover:bg-primary hover:text-black hover:border-primary px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
-                        تسجيل سداد
-                      </button>
+                      <div className="flex items-center justify-center gap-2">
+                        {deleteConfirmId === s.id ? (
+                          <div className="flex items-center gap-1 bg-red-500/10 rounded-xl p-1 border border-red-500/20">
+                            <button onClick={() => { onDelete(s.id); setDeleteConfirmId(null); }} className="p-2 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-all" title="تأكيد"><Check size={14} /></button>
+                            <button onClick={() => setDeleteConfirmId(null)} className="p-2 text-white/40 hover:text-white rounded-lg transition-all" title="إلغاء"><X size={14} /></button>
+                          </div>
+                        ) : (
+                          <>
+                            <button onClick={() => setSelectedId(s.id)} className="bg-white/5 text-white/60 border border-white/10 hover:bg-primary hover:text-black hover:border-primary px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
+                              تسجيل سداد
+                            </button>
+                            <button onClick={() => setDeleteConfirmId(s.id)} className="p-2 text-white/20 hover:text-red-500 transition-all rounded-xl hover:bg-white/5">✕</button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -710,6 +774,63 @@ const Contacts = ({ contacts, onPay }: { contacts: any[], onPay: (id: string, am
           </div>
         </div>
       </div>
+
+      {/* Add Contact Modal */}
+      <AnimatePresence>
+        {showAddModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-xl z-[80] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-sidebar w-full max-w-md rounded-[40px] border border-white/10 p-10 flex flex-col gap-8 shadow-2xl"
+            >
+              <div className="flex justify-between items-center">
+                <h3 className="text-xl font-bold text-white">إضافة جهة اتصال جديدة</h3>
+                <button onClick={() => setShowAddModal(false)} className="text-white/40 hover:text-white">✕</button>
+              </div>
+              
+              <div className="space-y-6">
+                <div className="flex bg-white/5 p-1.5 rounded-2xl border border-white/5">
+                  <button onClick={() => setNewContact(prev => ({ ...prev, type: 'customer' }))} className={cn("flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all", newContact.type === 'customer' ? "bg-primary text-black" : "text-white/40")}>عميل</button>
+                  <button onClick={() => setNewContact(prev => ({ ...prev, type: 'supplier' }))} className={cn("flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all", newContact.type === 'supplier' ? "bg-primary text-black" : "text-white/40")}>مورد</button>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase font-black tracking-widest text-white/30 px-2 block">الاسم بالكامل</label>
+                  <input 
+                    value={newContact.name}
+                    onChange={(e) => setNewContact(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-right font-bold outline-none focus:ring-2 focus:ring-primary/20"
+                    placeholder="اسم الجهة..."
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase font-black tracking-widest text-white/30 px-2 block">
+                    {newContact.type === 'customer' ? 'رصيد المديونية الابتدائي' : 'المبلغ المستحق للمورد'}
+                  </label>
+                  <input 
+                    type="number"
+                    value={newContact.type === 'customer' ? newContact.debt : newContact.balance}
+                    onChange={(e) => setNewContact(prev => ({ ...prev, [newContact.type === 'customer' ? 'debt' : 'balance']: parseFloat(e.target.value) || 0 }))}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-right font-bold outline-none focus:ring-2 focus:ring-primary/20"
+                    placeholder="0.00"
+                  />
+                </div>
+
+                <button 
+                  onClick={handleAdd}
+                  disabled={!newContact.name}
+                  className="w-full bg-primary text-black py-5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-primary/90 transition-all shadow-xl disabled:opacity-50"
+                >
+                  تأكيد الإضافة
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* History Modal */}
       <AnimatePresence>
@@ -812,11 +933,15 @@ const Contacts = ({ contacts, onPay }: { contacts: any[], onPay: (id: string, am
   );
 };
 
-const Inventory = ({ inventory, onUpdate }: any) => {
+const Inventory = ({ inventory, onUpdate, onAdd, onDelete }: any) => {
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  const [detailId, setDetailId] = React.useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = React.useState<string | null>(null);
   const [mode, setMode] = React.useState<'restock' | 'withdraw'>('restock');
   const [amount, setAmount] = React.useState('');
   const [price, setPrice] = React.useState('');
+  const [showAddModal, setShowAddModal] = React.useState(false);
+  const [newItem, setNewItem] = React.useState({ name: '', quantity: 0, price: 0, unit: 'جوال', iconName: 'Package' });
 
   const handleUpdate = () => {
     if (!selectedId || !amount) return;
@@ -833,6 +958,20 @@ const Inventory = ({ inventory, onUpdate }: any) => {
     setPrice('');
   };
 
+  const handleAddItem = () => {
+    if (!newItem.name) return;
+    onAdd({
+      ...newItem,
+      status: newItem.quantity > 10 ? 'available' : newItem.quantity > 0 ? 'low' : 'out',
+      quantity: parseFloat(newItem.quantity.toString()) || 0,
+      price: parseFloat(newItem.price.toString()) || 0
+    });
+    setShowAddModal(false);
+    setNewItem({ name: '', quantity: 0, price: 0, unit: 'جوال', iconName: 'Package' });
+  };
+
+  const selectedItemForDetails = inventory.find((i: any) => i.id === detailId);
+
   return (
     <div className="flex flex-col gap-10 animate-in zoom-in-95 duration-700">
       <div className="flex flex-col sm:flex-row justify-between items-end gap-6">
@@ -840,6 +979,13 @@ const Inventory = ({ inventory, onUpdate }: any) => {
           <h1 className="text-4xl font-light text-white mb-2">إدارة <span className="font-medium text-primary">المواد الخام الاستراتيجية</span></h1>
           <p className="text-white/40 text-sm font-light italic">مراقبة مستويات الوقود والدقيق والسلع الأساسية في الوقت الفعلي</p>
         </div>
+        <button 
+          onClick={() => setShowAddModal(true)}
+          className="bg-primary text-black px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-3 hover:bg-primary/90 transition-all shadow-xl shadow-primary/10"
+        >
+          <PlusCircle size={18} />
+          إضافة صنف جديد
+        </button>
       </div>
 
       <div className="bg-sidebar border border-white/5 rounded-[40px] shadow-2xl overflow-hidden flex flex-col">
@@ -857,19 +1003,25 @@ const Inventory = ({ inventory, onUpdate }: any) => {
                 <th className="py-6 px-10 text-center">المؤشر</th>
                 <th className="py-6 px-10">الكمية المتوفرة</th>
                 <th className="py-6 px-10">سعر الوحدة</th>
-                <th className="py-6 px-10 text-center">تحديث</th>
+                <th className="py-6 px-10 text-center">تحديث / إجراء</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.03]">
               {inventory.map((item: any, i: number) => (
                 <tr key={i} className="hover:bg-white/[0.02] transition-colors group">
                   <td className="py-6 px-10">
-                    <div className="flex items-center gap-5">
-                      <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-primary group-hover:scale-110 transition-transform border border-white/5">
+                    <button 
+                      onClick={() => setDetailId(item.id)}
+                      className="flex items-center gap-5 text-right hover:text-primary transition-all group/btn"
+                    >
+                      <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-primary group-hover:scale-110 group-hover/btn:bg-primary group-hover/btn:text-black transition-all border border-white/5">
                         <item.icon size={22} />
                       </div>
-                      <span className="font-bold text-white group-hover:text-primary transition-colors">{item.name}</span>
-                    </div>
+                      <div className="flex flex-col">
+                        <span className="font-bold text-white group-hover/btn:text-primary transition-colors">{item.name}</span>
+                        <span className="text-[8px] text-white/20 uppercase font-black group-hover/btn:text-white/40">عرض البيانات التحليلية</span>
+                      </div>
+                    </button>
                   </td>
                   <td className="py-6 px-10 text-center">
                     <StatusBadge status={item.status} />
@@ -883,18 +1035,34 @@ const Inventory = ({ inventory, onUpdate }: any) => {
                   <td className="py-6 px-10 font-bold text-white/60 text-sm italic">{formatCurrency(item.price)}</td>
                   <td className="py-6 px-10 text-center">
                     <div className="flex items-center justify-center gap-2">
-                      <button 
-                        onClick={() => { setSelectedId(item.id); setMode('restock'); }} 
-                        className="bg-white/5 text-white/40 border border-white/10 hover:bg-primary hover:text-black hover:border-primary px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all"
-                      >
-                        تحديث الوارد
-                      </button>
-                      <button 
-                        onClick={() => { setSelectedId(item.id); setMode('withdraw'); }} 
-                        className="bg-white/5 text-white/40 border border-white/10 hover:bg-red-500 hover:text-white hover:border-red-500 px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all"
-                      >
-                        سحب استهلاك
-                      </button>
+                      {deleteConfirmId === item.id ? (
+                        <div className="flex items-center gap-1 bg-red-500/10 rounded-xl p-1 border border-red-500/20">
+                          <button onClick={() => { onDelete(item.id); setDeleteConfirmId(null); }} className="p-2 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-all"><Check size={14} /></button>
+                          <button onClick={() => setDeleteConfirmId(null)} className="p-2 text-white/40 hover:text-white rounded-lg transition-all"><X size={14} /></button>
+                        </div>
+                      ) : (
+                        <>
+                          <button 
+                            onClick={() => { setSelectedId(item.id); setMode('restock'); }} 
+                            className="bg-white/5 text-white/40 border border-white/10 hover:bg-primary hover:text-black hover:border-primary px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all"
+                          >
+                            تحديث الوارد
+                          </button>
+                          <button 
+                            onClick={() => { setSelectedId(item.id); setMode('withdraw'); }} 
+                            className="bg-white/5 text-white/40 border border-white/10 hover:bg-red-500 hover:text-white hover:border-red-500 px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all"
+                          >
+                            سحب استهلاك
+                          </button>
+                          <button 
+                            onClick={() => setDeleteConfirmId(item.id)} 
+                            className="p-2 text-white/20 hover:text-red-500 transition-all rounded-xl hover:bg-white/5"
+                            title="حذف"
+                          >
+                            ✕
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -929,15 +1097,202 @@ const Inventory = ({ inventory, onUpdate }: any) => {
             <div className="relative z-10">
               <h3 className="text-2xl font-black mb-3 leading-none uppercase tracking-tighter">القدرة الإنتاجية الحالية</h3>
               <p className="text-black/60 text-sm leading-relaxed max-w-[220px] font-medium italic">
-                بناءً على كمية الدقيق والوقود المتوفرة، يمكن تشغيل <span className="text-black font-black underline underline-offset-4 decoration-2">{Math.floor(inventory[0].quantity * 20)}</span> وحدة إنتاجية.
+                بناءً على كمية الدقيق والوقود المتوفرة، يمكن تشغيل <span className="text-black font-black underline underline-offset-4 decoration-2">{Math.floor((inventory[0]?.quantity || 0) * 20)}</span> وحدة إنتاجية.
               </p>
             </div>
             <div className="bg-black/10 p-6 rounded-3xl backdrop-blur-md relative z-10 border border-black/5 flex flex-col items-center shadow-inner">
-               <span className="text-5xl font-black tracking-tighter leading-none">{(inventory.filter((i:any) => i.status === 'available').length / inventory.length * 100).toFixed(0)}%</span>
+               <span className="text-5xl font-black tracking-tighter leading-none">{(inventory.filter((i:any) => i.status === 'available').length / (inventory.length || 1) * 100).toFixed(0)}%</span>
                <p className="text-[10px] uppercase font-black tracking-widest text-black/40 text-center mt-3">جاهزية التوريد</p>
             </div>
          </div>
       </div>
+
+       {/* Item Details Modal */}
+       <AnimatePresence>
+         {selectedItemForDetails && (
+           <div className="fixed inset-0 bg-black/90 backdrop-blur-3xl z-[80] flex items-center justify-center p-6">
+             <motion.div 
+               initial={{ scale: 0.95, opacity: 0 }}
+               animate={{ scale: 1, opacity: 1 }}
+               exit={{ scale: 0.95, opacity: 0 }}
+               className="bg-sidebar w-full max-w-lg rounded-[48px] border border-white/10 overflow-hidden shadow-2xl"
+             >
+                <div className="p-12 flex flex-col gap-10">
+                   <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-6">
+                         <div className="w-20 h-20 bg-primary rounded-3xl flex items-center justify-center text-black">
+                            {selectedItemForDetails.icon && <selectedItemForDetails.icon size={36} />}
+                         </div>
+                         <div className="flex flex-col">
+                            <h3 className="text-3xl font-black text-white leading-tight">{selectedItemForDetails.name}</h3>
+                            <div className="flex items-center gap-3 mt-1">
+                               <StatusBadge status={selectedItemForDetails.status} />
+                               <span className="text-[10px] text-white/30 uppercase font-black tracking-widest leading-none">مادة خام استراتيجية</span>
+                            </div>
+                         </div>
+                      </div>
+                      <button onClick={() => setDetailId(null)} className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center text-white/40 hover:bg-white/10 hover:text-white transition-all">✕</button>
+                   </div>
+
+                   <div className="grid grid-cols-2 gap-6">
+                      <div className="bg-white/[0.02] border border-white/5 p-8 rounded-[32px] flex flex-col gap-2">
+                         <span className="text-[10px] text-white/20 uppercase font-black tracking-widest">الرصيد الحالي</span>
+                         <div className="flex items-baseline gap-2">
+                            <span className="text-3xl font-black text-white leading-none">{selectedItemForDetails.quantity}</span>
+                            <span className="text-xs text-white/40 font-bold uppercase">{selectedItemForDetails.unit}</span>
+                         </div>
+                      </div>
+                      <div className="bg-white/[0.02] border border-white/5 p-8 rounded-[32px] flex flex-col gap-2">
+                         <span className="text-[10px] text-white/20 uppercase font-black tracking-widest">متوسط التكلفة</span>
+                         <span className="text-2xl font-black text-primary leading-none tracking-tighter">{formatCurrency(selectedItemForDetails.price)}</span>
+                      </div>
+                   </div>
+
+                   <div className="bg-white/[0.02] border border-white/5 p-8 rounded-[32px] flex flex-col gap-4">
+                      <div className="flex justify-between items-center">
+                         <span className="text-[10px] text-white/20 uppercase font-black tracking-widest">إجمالي قيمة الأصل</span>
+                         <span className="text-2xl font-black text-white">{formatCurrency(selectedItemForDetails.quantity * selectedItemForDetails.price)}</span>
+                      </div>
+                      <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+                         <div className="h-full bg-primary" style={{ width: `${Math.min(100, (selectedItemForDetails.quantity / 500) * 100)}%` }} />
+                      </div>
+                      <p className="text-[10px] text-white/20 font-bold text-center leading-none italic uppercase">مؤشر كفاءة المخزون بناءً على متوسط الاستهلاك الشهري</p>
+                   </div>
+
+                   <div className="flex flex-col gap-4">
+                      <span className="text-[10px] text-white/20 uppercase font-black tracking-widest px-8">سجل العمليات الأخير</span>
+                      <div className="max-h-[200px] overflow-y-auto px-4 space-y-3 custom-scrollbar">
+                         {selectedItemForDetails.history && selectedItemForDetails.history.length > 0 ? (
+                           [...selectedItemForDetails.history].reverse().map((h: any, idx: number) => (
+                             <div key={idx} className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl flex justify-between items-center">
+                                <div className="flex items-center gap-4">
+                                   <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", h.type === 'addition' ? "bg-primary/20 text-primary" : "bg-red-500/20 text-red-500")}>
+                                      {h.type === 'addition' ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                                   </div>
+                                   <div className="flex flex-col">
+                                      <span className="text-[10px] text-white font-bold">{h.type === 'addition' ? 'توريد كمية' : 'سحب كمية'}</span>
+                                      <span className="text-[10px] text-white/30">{h.date}</span>
+                                   </div>
+                                </div>
+                                <div className="text-right">
+                                   <span className={cn("text-xs font-black", h.type === 'addition' ? "text-primary" : "text-red-500")}>
+                                      {h.type === 'addition' ? '+' : '-'}{h.amount} {selectedItemForDetails.unit}
+                                   </span>
+                                </div>
+                             </div>
+                           ))
+                         ) : (
+                           <p className="text-[10px] text-white/20 text-center py-8 italic">لا يوجد سجل عمليات لهذا الصنف بعد</p>
+                         )}
+                      </div>
+                   </div>
+
+                   <div className="grid grid-cols-2 gap-4">
+                      <button 
+                        onClick={() => { setDetailId(null); setSelectedId(selectedItemForDetails.id); setMode('restock'); }}
+                        className="py-5 bg-primary text-black rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-primary/90 transition-all flex items-center justify-center gap-3"
+                      >
+                         تحديث الوارد
+                      </button>
+                      <button 
+                        onClick={() => { setDetailId(null); setSelectedId(selectedItemForDetails.id); setMode('withdraw'); }}
+                        className="py-5 bg-red-500/10 text-red-500 border border-red-500/20 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-500/20 transition-all"
+                      >
+                         سحب استهلاك
+                      </button>
+                   </div>
+                </div>
+             </motion.div>
+           </div>
+         )}
+       </AnimatePresence>
+
+       {/* Add Item Modal */}
+       <AnimatePresence>
+        {showAddModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-xl z-[80] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-sidebar w-full max-w-md rounded-[40px] border border-white/10 p-10 flex flex-col gap-8 shadow-2xl"
+            >
+              <div className="flex justify-between items-center">
+                <h3 className="text-xl font-bold text-white">إضافة صنف جديد للمخزون</h3>
+                <button onClick={() => setShowAddModal(false)} className="text-white/40 hover:text-white">✕</button>
+              </div>
+              
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase font-black tracking-widest text-white/30 px-2 block">اسم الصنف (دقيق، سكر..)</label>
+                  <input 
+                    value={newItem.name}
+                    onChange={(e) => setNewItem(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-right font-bold outline-none focus:ring-2 focus:ring-primary/20"
+                    placeholder="مثال: دقيق فاخر..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase font-black tracking-widest text-white/30 px-2 block">الكمية الابتدائية</label>
+                    <input 
+                      type="number"
+                      value={newItem.quantity}
+                      onChange={(e) => setNewItem(prev => ({ ...prev, quantity: parseFloat(e.target.value) || 0 }))}
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-right font-bold outline-none focus:ring-2 focus:ring-primary/20"
+                      placeholder="0"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase font-black tracking-widest text-white/30 px-2 block">الوحدة (جوال، لتر..)</label>
+                    <input 
+                      value={newItem.unit}
+                      onChange={(e) => setNewItem(prev => ({ ...prev, unit: e.target.value }))}
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-right font-bold outline-none focus:ring-2 focus:ring-primary/20"
+                      placeholder="جوال"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase font-black tracking-widest text-white/30 px-2 block">متوسط سعر التكلفة للوحدة</label>
+                  <input 
+                    type="number"
+                    value={newItem.price}
+                    onChange={(e) => setNewItem(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-right font-bold outline-none focus:ring-2 focus:ring-primary/20"
+                    placeholder="0.00"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase font-black tracking-widest text-white/30 px-2 block">أيقونة الصنف</label>
+                  <select 
+                    value={newItem.iconName}
+                    onChange={(e) => setNewItem(prev => ({ ...prev, iconName: e.target.value }))}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-right font-bold outline-none focus:ring-2 focus:ring-primary/20 appearance-none"
+                  >
+                    <option value="Wheat">دقيق / قمح</option>
+                    <option value="Droplets">زيت / سائل</option>
+                    <option value="Beaker">كيماويات / خميرة</option>
+                    <option value="Fuel">طاقة / ديزل</option>
+                    <option value="Package">عام / طرد</option>
+                  </select>
+                </div>
+
+                <button 
+                  onClick={handleAddItem}
+                  disabled={!newItem.name}
+                  className="w-full bg-primary text-black py-5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-primary/90 transition-all shadow-xl disabled:opacity-50"
+                >
+                  تأكيد الإضافة للمخزون
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
        {/* Restock Modal */}
        <AnimatePresence>
@@ -1200,9 +1555,20 @@ export default function App() {
     if (!item) return;
 
     const newQty = Math.max(0, item.quantity + amount);
+    const date = new Date().toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' }) + ' ' + new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+    
+    const historyEntry = {
+      date,
+      type: amount > 0 ? 'addition' : 'withdrawal',
+      amount: Math.abs(amount),
+      prevQty: item.quantity,
+      newQty: newQty
+    };
+
     const updates: any = {
       quantity: newQty,
-      status: newQty > 10 ? 'available' : newQty > 0 ? 'low' : 'out'
+      status: newQty > 10 ? 'available' : newQty > 0 ? 'low' : 'out',
+      history: [...(item.history || []), historyEntry]
     };
 
     if (cost && amount > 0) {
@@ -1254,6 +1620,50 @@ export default function App() {
       } catch (error) {
         handleFirestoreError(error, OperationType.UPDATE, `contacts/${id}`);
       }
+    }
+  };
+
+  const addContact = async (data: any) => {
+    if (!user) return;
+    try {
+      await addDoc(collection(db, 'contacts'), {
+        ...data,
+        userId: user.uid,
+        history: []
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'contacts');
+    }
+  };
+
+  const deleteContact = async (id: string) => {
+    if (!user) return;
+    try {
+      await deleteDoc(doc(db, 'contacts', id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `contacts/${id}`);
+    }
+  };
+
+  const addInventoryItem = async (data: any) => {
+    if (!user) return;
+    try {
+      await addDoc(collection(db, 'inventory'), {
+        ...data,
+        userId: user.uid,
+        history: []
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'inventory');
+    }
+  };
+
+  const deleteInventoryItem = async (id: string) => {
+    if (!user) return;
+    try {
+      await deleteDoc(doc(db, 'inventory', id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `inventory/${id}`);
     }
   };
 
@@ -1319,8 +1729,8 @@ export default function App() {
                 <>
                   {view === 'dashboard' && <Dashboard stats={{ netValue, dailyIncome, dailyExpense, totalDebt }} transactions={transactions} inventory={inventory} />}
                   {view === 'finance' && <Finance stats={{ dailyIncome, dailyExpense }} transactions={transactions} onAdd={addTransaction} />}
-                  {view === 'contacts' && <Contacts contacts={contacts} onPay={handlePayment} />}
-                  {view === 'inventory' && <Inventory inventory={inventory} onUpdate={updateInventory} />}
+                  {view === 'contacts' && <Contacts contacts={contacts} onPay={handlePayment} onAdd={addContact} onDelete={deleteContact} />}
+                  {view === 'inventory' && <Inventory inventory={inventory} onUpdate={updateInventory} onAdd={addInventoryItem} onDelete={deleteInventoryItem} />}
                   {view === 'reports' && (
                     <Reports 
                       transactions={transactions} 
