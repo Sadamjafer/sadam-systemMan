@@ -63,5 +63,22 @@ service cloud.firestore {
                     && incoming().userId == existing().userId;
       allow delete: if isOwner(existing());
     }
+
+    // --- Finance Categories Rules ---
+    function isValidFinanceCategory(data) {
+      return data.keys().hasAll(['name', 'type', 'userId'])
+      && data.name is string && data.name.size() <= 100
+      && data.type in ['income', 'expense']
+      && data.userId == request.auth.uid;
+    }
+
+    match /financeCategories/{categoryId} {
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isOwner(resource.data);
+      allow create: if isSignedIn() && isValidFinanceCategory(incoming());
+      allow update: if isOwner(existing()) && isValidFinanceCategory(incoming())
+                    && incoming().userId == existing().userId;
+      allow delete: if isOwner(existing());
+    }
   }
 }

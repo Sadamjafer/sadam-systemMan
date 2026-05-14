@@ -47,6 +47,17 @@
         "userId": { "type": "string" }
       },
       "required": ["name", "quantity", "price", "userId"]
+    },
+    "FinanceCategory": {
+      "title": "Finance Category",
+      "description": "Categories for income and expenses",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["income", "expense"] },
+        "userId": { "type": "string" }
+      },
+      "required": ["name", "type", "userId"]
     }
   },
   "firestore": {
@@ -61,6 +72,10 @@
     "inventory": {
       "schema": "InventoryItem",
       "description": "Global inventory list"
+    },
+    "financeCategories": {
+      "schema": "FinanceCategory",
+      "description": "Categories for financial transactions"
     }
   }
 }

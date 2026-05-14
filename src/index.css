@@ -6,17 +6,35 @@
 
   --color-primary: #c5a059;
   --color-primary-foreground: #000000;
-  --color-sidebar: #121212;
-  --color-bakery-surface: #0a0a0a;
-  --color-surface-card: #161616;
-  --color-surface-variant: rgba(255, 255, 255, 0.03);
-  --color-on-surface: #e0e0e0;
-  --color-on-surface-muted: rgba(255, 255, 255, 0.4);
   --color-accent: #c5a059;
+
+  --color-bakery-surface: var(--color-bakery-surface);
+  --color-sidebar: var(--color-sidebar);
+  --color-surface-card: var(--color-surface-card);
+  --color-on-surface: var(--color-on-surface);
+  --color-on-surface-muted: var(--color-on-surface-muted);
   
   --radius-xl: 1rem;
   --radius-2xl: 1.5rem;
   --radius-3xl: 2rem;
+}
+
+:root {
+  --color-bakery-surface: #0a0a0a;
+  --color-sidebar: #121212;
+  --color-surface-card: #161616;
+  --color-on-surface: #e0e0e0;
+  --color-on-surface-muted: rgba(255, 255, 255, 0.4);
+  --surface-variant: rgba(255, 255, 255, 0.03);
+}
+
+.light {
+  --color-bakery-surface: #f9f8f3;
+  --color-sidebar: #f2f1e9;
+  --color-surface-card: #ffffff;
+  --color-on-surface: #2d2b28;
+  --color-on-surface-muted: #6e6a64;
+  --surface-variant: rgba(45, 43, 40, 0.05);
 }
 
 @layer base {
@@ -24,7 +42,7 @@
     direction: rtl;
   }
   body {
-    @apply bg-bakery-surface text-on-surface font-sans antialiased;
+    @apply bg-bakery-surface text-on-surface font-sans antialiased transition-colors duration-300;
   }
 }
 

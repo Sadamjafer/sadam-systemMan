@@ -27,7 +27,17 @@ import {
   Filter,
   LogOut,
   Check,
-  X
+  X,
+  XCircle,
+  LayoutGrid,
+  Plus,
+  Trash2,
+  Edit2,
+  Settings2,
+  Calendar,
+  CheckCircle2,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -41,6 +51,34 @@ import {
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, formatCurrency } from './lib/utils';
+
+const formatWithCommas = (val: string | number) => {
+  if (val === undefined || val === null || val === "") return "";
+  const str = val.toString();
+  const num = str.replace(/,/g, "");
+  if (isNaN(Number(num))) return str;
+  const parts = num.split(".");
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return parts.join(".");
+};
+
+const NumericInput = ({ value, onChange, ...props }: any) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawValue = e.target.value.replace(/,/g, "");
+    if (rawValue === "" || rawValue === "." || !isNaN(Number(rawValue))) {
+      onChange(rawValue);
+    }
+  };
+
+  return (
+    <input
+      {...props}
+      type="text"
+      value={formatWithCommas(value)}
+      onChange={handleChange}
+    />
+  );
+};
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { 
@@ -104,7 +142,7 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 }
 
 // --- Types ---
-type View = 'dashboard' | 'finance' | 'contacts' | 'inventory' | 'reports';
+type View = 'dashboard' | 'finance' | 'contacts' | 'inventory' | 'reports' | 'categories';
 
 interface Transaction {
   id: string;
@@ -113,6 +151,7 @@ interface Transaction {
   amount: number;
   type: 'income' | 'expense';
   category: string;
+  timestamp?: number;
 }
 
 interface InventoryItem {
@@ -127,29 +166,39 @@ interface InventoryItem {
 
 // --- Components ---
 
-const Sidebar = ({ activeView, setView, user }: { activeView: View, setView: (v: View) => void, user: User }) => {
+const Sidebar = ({ activeView, setView, user, theme, toggleTheme }: { activeView: View, setView: (v: View) => void, user: User, theme: 'dark' | 'light', toggleTheme: () => void }) => {
   const navItems = [
     { id: 'dashboard', label: 'الرئيسية', icon: LayoutDashboard },
     { id: 'finance', label: 'المالية', icon: Wallet },
     { id: 'contacts', label: 'جهات الاتصال', icon: Users },
     { id: 'inventory', label: 'المخزون', icon: Package },
     { id: 'reports', label: 'التقارير', icon: BarChart3 },
+    { id: 'categories', label: 'إدارة التصنيفات', icon: Settings2 },
   ];
 
   return (
-    <aside className="hidden lg:flex flex-col h-screen w-72 fixed right-0 top-0 bg-sidebar border-l border-white/5 p-8 gap-2 z-40">
-      <div className="flex items-center gap-4 mb-12 flex-row">
-        <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-black font-bold text-xl shrink-0 shadow-lg shadow-primary/20">
-          L
+    <aside className="hidden lg:flex flex-col h-screen w-72 fixed right-0 top-0 bg-sidebar border-l border-white/5 p-8 gap-2 z-40 transition-colors duration-300">
+      <div className="flex items-center justify-between mb-12">
+        <div className="flex items-center gap-4 flex-row">
+          <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-black font-bold text-xl shrink-0 shadow-lg shadow-primary/20">
+            L
+          </div>
+          <div>
+            <h2 className="text-xl font-medium tracking-tight text-on-surface leading-tight">لوكسوريا</h2>
+          </div>
         </div>
-        <div>
-          <h2 className="text-xl font-medium tracking-tight text-white leading-tight">لوكسوريا</h2>
-        </div>
+        <button 
+          onClick={toggleTheme}
+          className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-on-surface hover:bg-primary hover:text-black transition-all"
+          title={theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن'}
+        >
+          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+        </button>
       </div>
 
       <nav className="flex flex-col gap-8 flex-1">
         <div className="space-y-4">
-          <p className="text-[10px] uppercase tracking-[0.2em] text-white/30 font-semibold mb-6 px-4">القائمة الرئيسية</p>
+          <p className="text-[10px] uppercase tracking-[0.2em] text-on-surface-muted font-semibold mb-6 px-4">القائمة الرئيسية</p>
           {navItems.map((item) => (
             <button
               key={item.id}
@@ -158,12 +207,12 @@ const Sidebar = ({ activeView, setView, user }: { activeView: View, setView: (v:
                 "flex items-center justify-start gap-4 px-4 py-1.5 transition-all duration-200 group relative w-full",
                 activeView === item.id 
                   ? "text-primary" 
-                  : "text-white/50 hover:text-white"
+                  : "text-on-surface-muted hover:text-on-surface"
               )}
             >
               <div className={cn(
                 "w-1.5 h-1.5 rounded-full transition-all",
-                activeView === item.id ? "bg-primary scale-125" : "bg-transparent group-hover:bg-white/20"
+                activeView === item.id ? "bg-primary scale-125" : "bg-transparent group-hover:bg-on-surface/20"
               )} />
               <span className="text-sm font-medium tracking-wide">{item.label}</span>
             </button>
@@ -172,7 +221,7 @@ const Sidebar = ({ activeView, setView, user }: { activeView: View, setView: (v:
       </nav>
 
       <div className="mt-auto flex flex-col gap-4">
-        <div className="flex items-center gap-3 p-4 bg-white/5 rounded-2xl border border-white/5 overflow-hidden">
+        <div className="flex items-center gap-3 p-4 bg-on-surface/5 rounded-2xl border border-on-surface/5 overflow-hidden">
           {user.photoURL ? (
             <img src={user.photoURL} alt={user.displayName || ""} className="w-8 h-8 rounded-full" />
           ) : (
@@ -181,47 +230,61 @@ const Sidebar = ({ activeView, setView, user }: { activeView: View, setView: (v:
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-bold text-white truncate">{user.displayName}</p>
+            <p className="text-xs font-bold text-on-surface truncate">{user.displayName}</p>
             <button 
               onClick={() => signOut(auth)}
-              className="text-[10px] text-white/40 hover:text-red-400 transition-colors flex items-center gap-1"
+              className="text-[10px] text-on-surface-muted hover:text-red-400 transition-colors flex items-center gap-1"
             >
               <LogOut size={10} />
               تسجيل الخروج
             </button>
           </div>
         </div>
-        <div className="p-6 bg-white/5 rounded-3xl border border-white/5 backdrop-blur-sm text-center">
-          <p className="text-[10px] text-white/40 mb-1 font-light italic">الحساب المربوط</p>
-          <p className="text-[10px] mb-0 font-medium text-white/90 truncate">{user.email}</p>
+        <div className="p-6 bg-on-surface/5 rounded-3xl border border-on-surface/5 backdrop-blur-sm text-center">
+          <p className="text-[10px] text-on-surface-muted mb-1 font-light italic">الحساب المربوط</p>
+          <p className="text-[10px] mb-0 font-medium text-on-surface truncate">{user.email}</p>
         </div>
       </div>
     </aside>
   );
 };
 
-const TopBar = ({ netValue }: { netValue: number }) => {
+const TopBar = ({ netValue, theme, toggleTheme }: { netValue: number, theme: 'dark' | 'light', toggleTheme: () => void }) => {
   return (
-    <header className="flex justify-between items-center w-full px-12 py-6 bg-bakery-surface sticky top-0 z-30 lg:pr-72">
+    <header className="flex justify-between items-center w-full px-12 py-6 bg-bakery-surface sticky top-0 z-30 lg:pr-72 transition-colors duration-300">
       <div className="flex items-center gap-4">
         <div className="lg:hidden flex items-center gap-3">
-           <Menu size={24} className="text-primary" />
            <h1 className="text-xl font-black text-primary">لوكسوريا</h1>
         </div>
-        <div className="hidden lg:flex items-center bg-white/5 border border-white/5 rounded-full px-6 py-2.5 gap-3 text-white/40 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 transition-all backdrop-blur-md">
+        <div className="hidden lg:flex items-center bg-white/5 border border-white/5 rounded-full px-6 py-2.5 gap-3 text-on-surface-muted focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 transition-all backdrop-blur-md">
           <Search size={18} />
-          <input type="text" placeholder="بحث عن سجل استثماري..." className="bg-transparent border-none outline-none text-sm w-64 text-right placeholder:text-white/20" />
+          <input type="text" placeholder="بحث عن سجل استثماري..." className="bg-transparent border-none outline-none text-sm w-64 text-right placeholder:text-white/20 text-on-surface" />
         </div>
       </div>
 
       <div className="flex items-center gap-6">
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={toggleTheme}
+            className="lg:hidden w-12 h-12 rounded-full border border-white/10 bg-white/5 flex items-center justify-center text-on-surface-muted hover:bg-white/10 transition-colors"
+          >
+            {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
+          <button 
+            onClick={() => signOut(auth)}
+            className="lg:hidden w-12 h-12 rounded-full border border-red-500/10 bg-red-500/5 flex items-center justify-center text-red-500/50 hover:bg-red-500/10 transition-colors"
+            title="تسجيل الخروج"
+          >
+            <LogOut size={20} />
+          </button>
+        </div>
         <div className="flex flex-col items-end">
-          <p className="text-[10px] uppercase tracking-widest text-white/30 mb-0.5">صافي القيمة</p>
+          <p className="text-[10px] uppercase tracking-widest text-on-surface-muted mb-0.5">صافي القيمة</p>
           <p className="text-lg font-bold text-primary leading-none">{formatCurrency(netValue)}</p>
         </div>
         <div className="h-10 w-px bg-white/10"></div>
         <button className="w-12 h-12 rounded-full border border-white/10 bg-white/5 flex items-center justify-center text-lg hover:bg-white/10 transition-colors relative group">
-          <Bell size={20} className="text-white/70 group-hover:text-white transition-colors" />
+          <Bell size={20} className="text-on-surface-muted group-hover:text-on-surface transition-colors" />
           <span className="absolute top-3 right-3 w-2 h-2 bg-primary rounded-full ring-2 ring-bakery-surface"></span>
         </button>
       </div>
@@ -231,9 +294,9 @@ const TopBar = ({ netValue }: { netValue: number }) => {
 
 const StatCard = ({ title, value, unit, trend, color, icon: Icon }: any) => {
   return (
-    <div className="bg-surface-card rounded-[32px] p-6 shadow-2xl border border-white/5 relative overflow-hidden group hover:border-white/10 transition-all">
+    <div className="bg-surface-card rounded-[32px] p-6 shadow-2xl border border-on-surface/5 relative overflow-hidden group hover:border-on-surface/10 transition-all">
       <div className="flex justify-between items-start mb-6">
-        <div className={cn("p-3 rounded-2xl bg-white/5 border border-white/5 text-primary group-hover:scale-110 transition-transform")}>
+        <div className={cn("p-3 rounded-2xl bg-on-surface/5 border border-on-surface/5 text-primary group-hover:scale-110 transition-transform")}>
           <Icon size={24} />
         </div>
         {trend && (
@@ -246,10 +309,10 @@ const StatCard = ({ title, value, unit, trend, color, icon: Icon }: any) => {
           </span>
         )}
       </div>
-      <h3 className="text-white/40 text-[10px] uppercase tracking-widest font-semibold mb-2">{title}</h3>
+      <h3 className="text-on-surface-muted text-[10px] uppercase tracking-widest font-semibold mb-2">{title}</h3>
       <div className="flex items-baseline gap-2">
-        <span className="text-3xl font-bold text-white tracking-tight">{value}</span>
-        <span className="text-xs text-white/30 font-medium italic">{unit}</span>
+        <span className="text-3xl font-bold text-on-surface tracking-tight">{value}</span>
+        <span className="text-xs text-on-surface-muted font-medium italic">{unit}</span>
       </div>
     </div>
   );
@@ -318,8 +381,8 @@ const Dashboard = ({ stats, transactions, inventory }: any) => {
     <div className="flex flex-col gap-10 animate-in fade-in duration-700">
       <div className="flex flex-col sm:flex-row justify-between items-end gap-4">
         <div>
-          <h1 className="text-4xl font-light text-white mb-2">مرحباً، <span className="font-medium text-primary">مدير المخبز</span></h1>
-          <p className="text-white/40 text-sm font-light italic">آخر تحديث للبيانات الاستثمارية: {new Date().toLocaleTimeString('ar-EG')}</p>
+          <h1 className="text-4xl font-light text-on-surface mb-2">مرحباً، <span className="font-medium text-primary">مدير المخبز</span></h1>
+          <p className="text-on-surface-muted text-sm font-light italic">آخر تحديث للبيانات الاستثمارية: {new Date().toLocaleTimeString('ar-EG')}</p>
         </div>
       </div>
 
@@ -331,27 +394,27 @@ const Dashboard = ({ stats, transactions, inventory }: any) => {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
-        <div className="xl:col-span-8 bg-gradient-to-bl from-[#1c1c1c] to-[#121212] rounded-[32px] p-8 shadow-2xl border border-white/5 flex flex-col justify-between h-[380px]">
+        <div className="xl:col-span-8 bg-sidebar rounded-[32px] p-8 shadow-2xl border border-on-surface/5 flex flex-col justify-between h-[380px]">
           <div className="flex justify-between items-start">
             <div>
-              <span className="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-[10px] text-white/60 mb-6 inline-block italic tracking-wider">كفاءة الإنتاج</span>
-              <h2 className="text-6xl font-light text-white">+{((stats.dailyIncome / (stats.dailyExpense || 1)) * 10).toFixed(1)}%</h2>
-              <p className="text-white/40 text-sm mt-3 font-light">نسبة استرداد التكاليف للدورة الحالية</p>
+              <span className="px-3 py-1 bg-on-surface/5 border border-on-surface/10 rounded-full text-[10px] text-on-surface-muted mb-6 inline-block italic tracking-wider">كفاءة الإنتاج</span>
+              <h2 className="text-6xl font-light text-on-surface">+{((stats.dailyIncome / (stats.dailyExpense || 1)) * 10).toFixed(1)}%</h2>
+              <p className="text-on-surface-muted text-sm mt-3 font-light">نسبة استرداد التكاليف للدورة الحالية</p>
             </div>
             <div className="flex gap-1.5 items-end h-24">
               {transactions.slice(0, 8).map((t: any, i: number) => (
-                <div key={i} className={cn("w-1.5 rounded-full", t.type === 'income' ? 'bg-primary' : 'bg-white/10')} style={{ height: `${Math.min(t.amount/1000, 100)}%` }}></div>
+                <div key={i} className={cn("w-1.5 rounded-full", t.type === 'income' ? 'bg-primary' : 'bg-on-surface/10')} style={{ height: `${Math.min(t.amount/1000, 100)}%` }}></div>
               ))}
             </div>
           </div>
-          <div className="flex gap-16 border-t border-white/5 pt-8">
+          <div className="flex gap-16 border-t border-on-surface/5 pt-8">
             <div>
-              <p className="text-[10px] uppercase tracking-widest text-white/30 mb-2">إجمالي تحركات العملة</p>
-              <p className="text-2xl font-medium text-white">{transactions.length} قيود</p>
+              <p className="text-[10px] uppercase tracking-widest text-on-surface-muted mb-2">إجمالي تحركات العملة</p>
+              <p className="text-2xl font-medium text-on-surface">{transactions.length} قيود</p>
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-widest text-white/30 mb-2">هامش الربح الفوري</p>
-              <p className="text-2xl font-medium text-white">{formatCurrency(stats.dailyIncome - stats.dailyExpense)}</p>
+              <p className="text-[10px] uppercase tracking-widest text-on-surface-muted mb-2">هامش الربح الفوري</p>
+              <p className="text-2xl font-medium text-on-surface">{formatCurrency(stats.dailyIncome - stats.dailyExpense)}</p>
             </div>
           </div>
         </div>
@@ -393,21 +456,21 @@ const Dashboard = ({ stats, transactions, inventory }: any) => {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-10">
         <div className="flex flex-col">
           <div className="flex justify-between items-center mb-8">
-             <h3 className="text-sm font-bold tracking-[0.2em] text-white/70 uppercase">أحدث التحركات المالية</h3>
+             <h3 className="text-sm font-bold tracking-[0.2em] text-on-surface-muted uppercase">أحدث التحركات المالية</h3>
           </div>
           <div className="space-y-4">
              {transactions.slice(0, 3).map((t: any, i: number) => (
-               <div key={i} className="bg-surface-card p-5 rounded-3xl flex justify-between items-center border border-white/[0.03] hover:border-white/10 transition-all group">
+               <div key={i} className="bg-surface-card p-5 rounded-3xl flex justify-between items-center border border-on-surface/5 hover:border-on-surface/10 transition-all group">
                  <div className="flex items-center gap-5">
-                   <div className={cn("w-12 h-12 rounded-full flex items-center justify-center text-xl transition-transform", t.type === 'income' ? 'bg-primary/10 text-primary' : 'bg-white/5 text-white/40')}>
+                   <div className={cn("w-12 h-12 rounded-full flex items-center justify-center text-xl transition-transform", t.type === 'income' ? 'bg-primary/10 text-primary' : 'bg-on-surface/5 text-on-surface-muted')}>
                      {t.type === 'income' ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
                    </div>
                    <div>
-                     <p className="text-sm font-medium text-white">{t.description}</p>
-                     <p className="text-[10px] text-white/30 italic mt-0.5">{t.date}</p>
+                     <p className="text-sm font-medium text-on-surface">{t.description}</p>
+                     <p className="text-[10px] text-on-surface-muted italic mt-0.5">{t.date}</p>
                    </div>
                  </div>
-                 <span className={cn("text-sm font-bold tracking-tight", t.type === 'income' ? "text-primary" : "text-white/60")}>
+                 <span className={cn("text-sm font-bold tracking-tight", t.type === 'income' ? "text-primary" : "text-on-surface-muted")}>
                    {t.type === 'income' ? '+' : '-'}{formatCurrency(t.amount)}
                  </span>
                </div>
@@ -417,17 +480,17 @@ const Dashboard = ({ stats, transactions, inventory }: any) => {
 
         <div className="flex flex-col">
           <div className="flex justify-between items-center mb-8">
-             <h3 className="text-sm font-bold tracking-[0.2em] text-white/70 uppercase">توزيع الأصول الاستراتيجية</h3>
-             <span className="text-[10px] text-white/30 font-light italic tracking-wide">إجمالي 4 فئات أساسية</span>
+             <h3 className="text-sm font-bold tracking-[0.2em] text-on-surface-muted uppercase">توزيع الأصول الاستراتيجية</h3>
+             <span className="text-[10px] text-on-surface-muted font-light italic tracking-wide">إجمالي 4 فئات أساسية</span>
           </div>
-          <div className="bg-sidebar/50 border border-white/5 rounded-[40px] p-10 flex-1 flex flex-col justify-center gap-10 backdrop-blur-xl shadow-inner">
+          <div className="bg-sidebar border border-on-surface/5 rounded-[40px] p-10 flex-1 flex flex-col justify-center gap-10 backdrop-blur-xl shadow-inner transition-colors">
              {[
                { label: 'الإنتاج', val: 65, color: 'bg-primary' },
                { label: 'المخزون', val: 20, color: 'bg-primary/60' },
-               { label: 'الاحتياطي', val: 15, color: 'bg-white/20' }
+               { label: 'الاحتياطي', val: 15, color: 'bg-on-surface/20' }
              ].map((item, i) => (
                <div key={i} className="flex items-center gap-6">
-                 <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                 <div className="flex-1 h-1.5 bg-on-surface/5 rounded-full overflow-hidden">
                    <motion.div 
                      initial={{ width: 0 }}
                      animate={{ width: `${item.val}%` }}
@@ -435,7 +498,7 @@ const Dashboard = ({ stats, transactions, inventory }: any) => {
                      className={cn("h-full rounded-full shadow-[0_0_10px_rgba(197,160,89,0.2)]", item.color)} 
                    />
                  </div>
-                 <span className="text-[10px] font-bold tracking-widest text-white/60 w-24 text-left uppercase">{item.label} {item.val}%</span>
+                 <span className="text-[10px] font-bold tracking-widest text-on-surface-muted w-24 text-left uppercase">{item.label} {item.val}%</span>
                </div>
              ))}
           </div>
@@ -445,30 +508,45 @@ const Dashboard = ({ stats, transactions, inventory }: any) => {
   );
 };
 
-const Finance = ({ stats, transactions, onAdd }: any) => {
+const Finance = ({ stats, transactions, categories, onAdd, onAddCategory }: any) => {
   const [tab, setTab] = React.useState<'income' | 'expense'>('income');
   const [amount, setAmount] = React.useState('');
-  const [desc, setDesc] = React.useState('');
+  const [selectedCategory, setSelectedCategory] = React.useState<string>('');
+  const [showCategoryPicker, setShowCategoryPicker] = React.useState(false);
+  const [showAddCategory, setShowAddCategory] = React.useState(false);
+  const [newCategoryName, setNewCategoryName] = React.useState('');
+
+  const filteredTransactions = transactions.filter((t: any) => t.type === tab);
+  const filteredCategories = categories.filter((c: any) => c.type === tab);
+  const totalAmount = filteredTransactions.reduce((acc: number, t: any) => acc + t.amount, 0);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!amount || !desc) return;
+    if (!amount || !selectedCategory) return;
     onAdd({
-      description: desc,
+      description: selectedCategory,
       amount: parseFloat(amount),
       type: tab,
       category: tab === 'income' ? 'sales' : 'expense'
     });
     setAmount('');
-    setDesc('');
+    setSelectedCategory('');
+  };
+
+  const handleAddCategory = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCategoryName) return;
+    onAddCategory(newCategoryName, tab);
+    setNewCategoryName('');
+    setShowAddCategory(false);
   };
 
   return (
     <div className="flex flex-col gap-10 animate-in slide-in-from-bottom-8 duration-700">
       <div className="flex flex-col md:flex-row justify-between items-end gap-6 bg-surface-card p-10 rounded-[40px] border border-white/5 shadow-2xl">
         <div>
-          <h2 className="text-4xl font-light text-white mb-2">المالية والقيود <span className="font-medium">اليومية</span></h2>
-          <p className="text-white/40 text-sm font-light italic">إدارة الإيرادات والمصروفات للدورة الحالية</p>
+          <h1 className="text-4xl font-light text-on-surface mb-2">المالية والقيود <span className="font-medium">اليومية</span></h1>
+          <p className="text-on-surface-muted text-sm font-light italic">إدارة الإيرادات والمصروفات للدورة الحالية</p>
         </div>
         <div className="flex flex-col items-end bg-primary text-black px-10 py-6 rounded-3xl shadow-2xl relative overflow-hidden min-w-[280px]">
           <span className="text-[10px] uppercase tracking-widest font-black opacity-60 mb-2">صافي الربح الفعلي</span>
@@ -481,8 +559,8 @@ const Finance = ({ stats, transactions, onAdd }: any) => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
         <div className="lg:col-span-5 flex flex-col gap-8">
           <div className="flex bg-white/5 p-2 rounded-[24px] border border-white/5 backdrop-blur-md">
-            <button onClick={() => setTab('income')} className={cn("flex-1 py-4 text-xs font-black uppercase tracking-widest rounded-2xl transition-all", tab === 'income' ? "bg-primary text-black" : "text-white/40")}>الإيرادات</button>
-            <button onClick={() => setTab('expense')} className={cn("flex-1 py-4 text-xs font-black uppercase tracking-widest rounded-2xl transition-all", tab === 'expense' ? "bg-red-500 text-white" : "text-white/40")}>المصروفات</button>
+            <button onClick={() => { setTab('income'); setSelectedCategory(''); }} className={cn("flex-1 py-4 text-xs font-black uppercase tracking-widest rounded-2xl transition-all", tab === 'income' ? "bg-primary text-black" : "text-white/40")}>الإيرادات</button>
+            <button onClick={() => { setTab('expense'); setSelectedCategory(''); }} className={cn("flex-1 py-4 text-xs font-black uppercase tracking-widest rounded-2xl transition-all", tab === 'expense' ? "bg-red-500 text-white" : "text-white/40")}>المصروفات</button>
           </div>
           <div className="bg-surface-card p-8 rounded-[40px] border border-white/5 shadow-2xl flex flex-col gap-8">
             <h3 className="text-sm font-bold tracking-[0.2em] text-white/80 uppercase flex items-center gap-3 border-b border-white/5 pb-6">
@@ -492,22 +570,54 @@ const Finance = ({ stats, transactions, onAdd }: any) => {
               تسجيل {tab === 'income' ? 'إيراد' : 'مصروف'} جديد
             </h3>
             <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-               <div className="space-y-2">
-                <label className="block text-[10px] uppercase tracking-widest font-black text-white/30 px-2">الوصف / التفاصيل</label>
-                <input 
-                  value={desc}
-                  onChange={(e) => setDesc(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none font-medium text-white transition-all backdrop-blur-md" 
-                  placeholder={tab === 'income' ? "مبيعات الوردية..." : "شراء مواد..."}
-                />
+               <div className="space-y-4">
+                <label className="block text-[10px] uppercase tracking-widest font-black text-white/30 px-2">التصنيف / الصنف</label>
+                {!selectedCategory ? (
+                  <button 
+                    type="button"
+                    onClick={() => setShowCategoryPicker(true)}
+                    className="w-full bg-white/5 border border-dashed border-white/20 rounded-2xl px-6 py-5 flex flex-col items-center gap-3 text-white/40 hover:text-primary hover:border-primary/40 transition-all group"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <LayoutGrid size={16} />
+                    </div>
+                    <span className="font-bold">اختر صنف {tab === 'income' ? 'الإيراد' : 'المصروف'}</span>
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-3 p-4 bg-white/5 rounded-2xl border border-white/10">
+                    <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", tab === 'income' ? "bg-primary/20 text-primary" : "bg-red-500/20 text-red-500")}>
+                      <LayoutGrid size={20} />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-[10px] text-white/30 font-black uppercase">الصنف المختار</p>
+                      <h4 className="font-bold text-white text-lg leading-tight">{selectedCategory}</h4>
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={() => setSelectedCategory('')}
+                      className="p-2 text-white/20 hover:text-red-400 transition-colors"
+                    >
+                      <XCircle size={20} />
+                    </button>
+                  </div>
+                )}
+                
+                <button 
+                  type="button"
+                  onClick={() => setShowAddCategory(true)}
+                  className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary/60 hover:text-primary transition-colors px-2"
+                >
+                  <Plus size={14} />
+                  إضافة صنف جديد
+                </button>
               </div>
+
               <div className="space-y-2">
                 <label className="block text-[10px] uppercase tracking-widest font-black text-white/30 px-2">المبلغ المالي</label>
                 <div className="relative">
-                  <input 
-                    type="number" 
+                  <NumericInput 
                     value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
+                    onChange={(val: string) => setAmount(val)}
                     className="w-full bg-white/5 border border-white/10 rounded-2xl pl-20 pr-6 py-4 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none font-medium text-white transition-all text-left placeholder:text-white/10" 
                     placeholder="00.00" 
                   />
@@ -521,31 +631,135 @@ const Finance = ({ stats, transactions, onAdd }: any) => {
           </div>
         </div>
 
+        {/* Categories Picker Modal */}
+        <AnimatePresence>
+          {showCategoryPicker && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-6">
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-sidebar w-full max-w-2xl rounded-[40px] border border-white/10 p-10 flex flex-col gap-8 shadow-2xl maxHeight-[80vh]"
+              >
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="text-2xl font-bold text-white">اختر صنف {tab === 'income' ? 'الإيراد' : 'المصروف'}</h3>
+                    <p className="text-white/30 text-sm italic">حدد الصنف لتسجيل العملية المالية</p>
+                  </div>
+                  <button onClick={() => setShowCategoryPicker(false)} className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all">
+                    <X size={24} />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 overflow-y-auto pr-2 custom-scrollbar">
+                  {filteredCategories.map((cat: any) => (
+                    <button
+                      key={cat.id}
+                      onClick={() => {
+                        setSelectedCategory(cat.name);
+                        setShowCategoryPicker(false);
+                      }}
+                      className="p-6 rounded-3xl bg-white/5 border border-white/10 text-right hover:border-primary/50 hover:bg-primary/5 transition-all group"
+                    >
+                      <h4 className="font-bold text-white group-hover:text-primary transition-colors">{cat.name}</h4>
+                      <p className="text-[10px] text-white/20 mt-1 uppercase font-black uppercase tracking-tighter">تصنيف معتمد</p>
+                    </button>
+                  ))}
+                  
+                  <button 
+                    onClick={() => {
+                      setShowCategoryPicker(false);
+                      setShowAddCategory(true);
+                    }}
+                    className="p-6 rounded-3xl border border-dashed border-white/20 flex items-center justify-center gap-3 text-white/30 hover:text-primary hover:border-primary/40 transition-all"
+                  >
+                    <Plus size={20} />
+                    <span className="font-bold">إضافة صنف جديد</span>
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Add Category Modal */}
+        <AnimatePresence>
+          {showAddCategory && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[60] flex items-center justify-center p-6">
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-sidebar w-full max-w-sm rounded-[40px] border border-white/10 p-10 flex flex-col gap-8 shadow-2xl"
+              >
+                <div className="flex flex-col gap-2 text-center">
+                  <h3 className="text-xl font-bold text-white">إضافة صنف جديد</h3>
+                  <p className="text-white/30 text-xs italic">سيتم حفظ الصنف بشكل دائم في قاعدة البيانات</p>
+                </div>
+                
+                <form onSubmit={handleAddCategory} className="flex flex-col gap-6">
+                  <div className="space-y-2">
+                    <label className="block text-[10px] uppercase tracking-widest font-black text-white/30 px-2 text-right">اسم الصنف</label>
+                    <input 
+                      autoFocus
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none font-bold text-white text-right"
+                      placeholder="مثلاً: صيانة المولد"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <button 
+                      type="button" 
+                      onClick={() => setShowAddCategory(false)}
+                      className="py-4 bg-white/5 text-white font-bold rounded-2xl hover:bg-white/10 transition-all"
+                    >
+                      إلغاء
+                    </button>
+                    <button 
+                      type="submit"
+                      className="py-4 bg-primary text-black font-bold rounded-2xl hover:bg-primary/90 transition-all"
+                    >
+                      حفظ الصنف
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
         <div className="lg:col-span-7 flex flex-col gap-8">
           <div className="bg-sidebar border border-white/5 rounded-[40px] shadow-2xl overflow-hidden flex-1 flex flex-col">
             <div className="p-8 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
-              <h3 className="text-sm font-black tracking-[0.2em] text-white/80 uppercase">سجل القيود المالية الجارية</h3>
+              <div className="flex flex-col gap-1">
+                <h3 className="text-sm font-black tracking-[0.2em] text-white/80 uppercase leading-none">
+                  {tab === 'income' ? 'سجل الإيرادات الحالية' : 'سجل المصروفات الحالية'}
+                </h3>
+                <p className="text-[10px] text-white/20 italic font-medium">
+                  {new Date().toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                </p>
+              </div>
             </div>
             <div className="overflow-x-auto flex-1">
               <table className="w-full text-right border-collapse">
-                <thead className="bg-black/20 text-white/30 text-[10px] font-black uppercase tracking-widest">
+                <thead className="bg-on-surface/5 text-on-surface-muted text-[10px] font-black uppercase tracking-widest">
                   <tr>
                     <th className="py-6 px-10">التفاصيل</th>
-                    <th className="py-6 px-10">التوقيت</th>
-                    <th className="py-6 px-10 text-left">المبلغ</th>
+                    <th className="py-6 px-10 text-left">المبلغ المالي</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/[0.03]">
-                  {transactions.slice(0, 10).map((row: any, i: number) => (
+                  {transactions.filter((t: any) => t.type === tab).slice(0, 10).map((row: any, i: number) => (
                     <tr key={i} className="hover:bg-white/[0.02] transition-colors group">
                       <td className="py-6 px-10">
                         <div className="flex items-center gap-3">
                           <div className={cn("w-1.5 h-1.5 rounded-full", row.type === 'income' ? "bg-primary" : "bg-red-500")} />
-                          <span className="font-bold text-white group-hover:text-primary transition-colors">{row.description}</span>
+                          <span className="font-bold text-on-surface group-hover:text-primary transition-colors">{row.description}</span>
                         </div>
                       </td>
-                      <td className="py-6 px-10 text-white/40 text-xs font-medium italic">{row.date}</td>
-                      <td className={cn("py-6 px-10 text-left font-black tracking-tight", row.type === 'income' ? "text-primary" : "text-white/60")}>
+                      <td className={cn("py-6 px-10 text-left font-black tracking-tight", row.type === 'income' ? "text-primary" : "text-on-surface-muted")}>
                         {row.type === 'income' ? '+' : '-'}{formatCurrency(row.amount)}
                       </td>
                     </tr>
@@ -553,6 +767,117 @@ const Finance = ({ stats, transactions, onAdd }: any) => {
                 </tbody>
               </table>
             </div>
+            <div className="p-8 border-t border-white/5 bg-on-surface/[0.02] flex justify-between items-center mt-auto">
+              <span className="text-xs font-black uppercase tracking-widest text-on-surface-muted">
+                إجمالي {tab === 'income' ? 'الإيرادات' : 'المصروفات'}
+              </span>
+              <span className={cn("text-2xl font-black tracking-tight", tab === 'income' ? "text-primary" : "text-red-500")}>
+                {formatCurrency(totalAmount)}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CategoryManager = ({ categories, onUpdate, onDelete }: any) => {
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [editName, setEditName] = React.useState('');
+
+  const handleStartEdit = (cat: any) => {
+    setEditingId(cat.id);
+    setEditName(cat.name);
+  };
+
+  const handleSave = async (id: string) => {
+    if (!editName) return;
+    await onUpdate(id, editName);
+    setEditingId(null);
+  };
+
+  return (
+    <div className="flex flex-col gap-10">
+      <div className="flex flex-col gap-2">
+        <h2 className="text-4xl font-black text-white tracking-tighter">إدارة التصنيفات</h2>
+        <p className="text-white/40 font-medium italic">تحرير وحذف أصناف الإيرادات والمصروفات</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Income Categories */}
+        <div className="bg-sidebar border border-white/5 rounded-[40px] shadow-2xl overflow-hidden flex flex-col">
+          <div className="p-8 border-b border-white/5 bg-primary/5 flex justify-between items-center">
+            <h3 className="text-sm font-black tracking-[0.2em] text-primary uppercase">أصناف الإيرادات</h3>
+          </div>
+          <div className="p-6 flex flex-col gap-4">
+            {categories.filter((c: any) => c.type === 'income').map((cat: any) => (
+              <div key={cat.id} className="flex items-center gap-4 p-4 rounded-[24px] bg-white/[0.02] border border-white/5 group hover:bg-white/5 transition-all">
+                <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary">
+                  <TrendingUp size={18} />
+                </div>
+                <div className="flex-1">
+                  {editingId === cat.id ? (
+                    <input 
+                      autoFocus
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      onBlur={() => handleSave(cat.id)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSave(cat.id)}
+                      className="bg-white/10 border border-primary/30 rounded-lg px-3 py-1 text-white text-right w-full outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  ) : (
+                    <h4 className="font-bold text-white text-right">{cat.name}</h4>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => handleStartEdit(cat)} className="p-2 text-white/20 hover:text-primary transition-colors">
+                    <Edit2 size={16} />
+                  </button>
+                  <button onClick={() => onDelete(cat.id)} className="p-2 text-white/20 hover:text-red-500 transition-colors">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Expense Categories */}
+        <div className="bg-sidebar border border-white/5 rounded-[40px] shadow-2xl overflow-hidden flex flex-col">
+          <div className="p-8 border-b border-white/5 bg-red-500/5 flex justify-between items-center">
+            <h3 className="text-sm font-black tracking-[0.2em] text-red-500 uppercase">أصناف المصروفات</h3>
+          </div>
+          <div className="p-6 flex flex-col gap-4">
+            {categories.filter((c: any) => c.type === 'expense').map((cat: any) => (
+              <div key={cat.id} className="flex items-center gap-4 p-4 rounded-[24px] bg-white/[0.02] border border-white/5 group hover:bg-white/5 transition-all">
+                <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center text-red-500">
+                  <TrendingDown size={18} />
+                </div>
+                <div className="flex-1">
+                  {editingId === cat.id ? (
+                    <input 
+                      autoFocus
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      onBlur={() => handleSave(cat.id)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSave(cat.id)}
+                      className="bg-white/10 border border-red-500/30 rounded-lg px-3 py-1 text-white text-right w-full outline-none focus:ring-1 focus:ring-red-500"
+                    />
+                  ) : (
+                    <h4 className="font-bold text-white text-right">{cat.name}</h4>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => handleStartEdit(cat)} className="p-2 text-white/20 hover:text-primary transition-colors">
+                    <Edit2 size={16} />
+                  </button>
+                  <button onClick={() => onDelete(cat.id)} className="p-2 text-white/20 hover:text-red-500 transition-colors">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -562,7 +887,7 @@ const Finance = ({ stats, transactions, onAdd }: any) => {
 
 const Contacts = ({ contacts, onPay, onAdd, onDelete }: { 
   contacts: any[], 
-  onPay: (id: string, amount: number, isSupplier: boolean) => void,
+  onPay: (id: string, amount: number, isSupplier: boolean, isDebtIncrease?: boolean) => void,
   onAdd: (contact: any) => void,
   onDelete: (id: string) => void
 }) => {
@@ -570,15 +895,17 @@ const Contacts = ({ contacts, onPay, onAdd, onDelete }: {
   const [historyId, setHistoryId] = React.useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = React.useState<string | null>(null);
   const [amount, setAmount] = React.useState('');
+  const [paymentMode, setPaymentMode] = React.useState<'pay' | 'debt'>('pay');
   const [showAddModal, setShowAddModal] = React.useState(false);
   const [newContact, setNewContact] = React.useState({ name: '', type: 'customer', debt: 0, balance: 0 });
 
   const handlePay = () => {
     if (!selectedId || !amount) return;
     const contact = contacts.find(c => c.id === selectedId);
-    onPay(selectedId, parseFloat(amount), contact.type === 'supplier');
+    onPay(selectedId, parseFloat(amount), contact.type === 'supplier', paymentMode === 'debt');
     setSelectedId(null);
     setAmount('');
+    setPaymentMode('pay');
   };
 
   const handleAdd = () => {
@@ -606,8 +933,8 @@ const Contacts = ({ contacts, onPay, onAdd, onDelete }: {
     <div className="flex flex-col gap-10 animate-in slide-in-from-left-8 duration-700">
       <div className="flex flex-col sm:flex-row justify-between items-end gap-6">
         <div className="flex flex-col gap-2">
-          <h1 className="text-4xl font-light text-white mb-1">إدارة <span className="font-medium text-primary">العلاقات الاستراتيجية</span></h1>
-          <p className="text-white/40 text-sm font-light italic">متابعة الأرصدة المتبادلة مع العملاء والموردين المعتمدين</p>
+          <h1 className="text-4xl font-light text-on-surface mb-1">إدارة <span className="font-medium text-primary">العلاقات الاستراتيجية</span></h1>
+          <p className="text-on-surface-muted text-sm font-light italic">متابعة الأرصدة المتبادلة مع العملاء والموردين المعتمدين</p>
         </div>
         <button 
           onClick={() => setShowAddModal(true)}
@@ -672,7 +999,7 @@ const Contacts = ({ contacts, onPay, onAdd, onDelete }: {
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-right border-collapse">
-              <thead className="bg-black/20 text-white/30 text-[10px] font-black uppercase tracking-widest">
+              <thead className="bg-on-surface/5 text-on-surface-muted text-[10px] font-black uppercase tracking-widest">
                 <tr>
                   <th className="py-6 px-10">هوية العميل</th>
                   <th className="py-6 px-10">إجمالي الدين</th>
@@ -691,8 +1018,8 @@ const Contacts = ({ contacts, onPay, onAdd, onDelete }: {
                           {c.initial}
                         </div>
                         <div className="flex flex-col">
-                           <span className="font-bold text-white group-hover:text-primary transition-colors">{c.name}</span>
-                           <span className="text-[9px] text-white/20 uppercase tracking-widest font-black">عرض السجل</span>
+                        <span className="font-bold text-on-surface group-hover:text-primary transition-colors">{c.name}</span>
+                        <span className="text-[9px] text-on-surface-muted uppercase tracking-widest font-black">عرض السجل</span>
                         </div>
                       </button>
                     </td>
@@ -706,9 +1033,10 @@ const Contacts = ({ contacts, onPay, onAdd, onDelete }: {
                           </div>
                         ) : (
                           <>
-                            <button onClick={() => setSelectedId(c.id)} className="p-3 text-white/20 hover:text-primary transition-all rounded-xl hover:bg-white/5" title="تحصيل مبلغ"><Wallet size={18} /></button>
+                            <button onClick={() => { setSelectedId(c.id); setPaymentMode('pay'); }} className="p-3 text-white/20 hover:text-emerald-500 transition-all rounded-xl hover:bg-white/5" title="تحصيل مبلغ"><TrendingUp size={18} /></button>
+                            <button onClick={() => { setSelectedId(c.id); setPaymentMode('debt'); }} className="p-3 text-white/20 hover:text-red-500 transition-all rounded-xl hover:bg-white/5" title="تسجيل مديونية جديدة"><PlusCircle size={18} /></button>
                             <button onClick={() => setDeleteConfirmId(c.id)} className="p-3 text-white/20 hover:text-red-500 transition-all rounded-xl hover:bg-white/5" title="حذف">
-                              <TrendingDown size={14} className="rotate-45" />✕
+                              <Trash2 size={16} />
                             </button>
                           </>
                         )}
@@ -730,7 +1058,7 @@ const Contacts = ({ contacts, onPay, onAdd, onDelete }: {
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-right border-collapse">
-              <thead className="bg-black/20 text-white/30 text-[10px] font-black uppercase tracking-widest">
+              <thead className="bg-on-surface/5 text-on-surface-muted text-[10px] font-black uppercase tracking-widest">
                 <tr>
                   <th className="py-6 px-10">المؤسسة</th>
                   <th className="py-6 px-10">الرصيد المفتوح</th>
@@ -745,8 +1073,8 @@ const Contacts = ({ contacts, onPay, onAdd, onDelete }: {
                         onClick={() => setHistoryId(s.id)}
                         className="flex flex-col text-right hover:text-primary transition-colors"
                       >
-                        <span className="font-bold text-white group-hover:text-primary transition-colors">{s.name}</span>
-                        <span className="text-[10px] text-white/20 font-medium mt-1 uppercase tracking-widest">سجل العمليات ←</span>
+                        <span className="font-bold text-on-surface group-hover:text-primary transition-colors">{s.name}</span>
+                        <span className="text-[10px] text-on-surface-muted font-medium mt-1 uppercase tracking-widest">سجل العمليات ←</span>
                       </button>
                     </td>
                     <td className="py-6 px-10 font-black text-primary tracking-tight">{formatCurrency(s.balance || 0)}</td>
@@ -759,10 +1087,13 @@ const Contacts = ({ contacts, onPay, onAdd, onDelete }: {
                           </div>
                         ) : (
                           <>
-                            <button onClick={() => setSelectedId(s.id)} className="bg-white/5 text-white/60 border border-white/10 hover:bg-primary hover:text-black hover:border-primary px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
+                            <button onClick={() => { setSelectedId(s.id); setPaymentMode('pay'); }} className="bg-white/5 text-white/60 border border-white/10 hover:bg-emerald-500 hover:text-black hover:border-emerald-500 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
                               تسجيل سداد
                             </button>
-                            <button onClick={() => setDeleteConfirmId(s.id)} className="p-2 text-white/20 hover:text-red-500 transition-all rounded-xl hover:bg-white/5">✕</button>
+                            <button onClick={() => { setSelectedId(s.id); setPaymentMode('debt'); }} className="bg-white/5 text-white/60 border border-white/10 hover:bg-red-500 hover:text-white hover:border-red-500 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
+                              مديونية جديدة
+                            </button>
+                            <button onClick={() => setDeleteConfirmId(s.id)} className="p-2 text-white/20 hover:text-red-500 transition-all rounded-xl hover:bg-white/5"><Trash2 size={16} /></button>
                           </>
                         )}
                       </div>
@@ -810,10 +1141,9 @@ const Contacts = ({ contacts, onPay, onAdd, onDelete }: {
                   <label className="text-[10px] uppercase font-black tracking-widest text-white/30 px-2 block">
                     {newContact.type === 'customer' ? 'رصيد المديونية الابتدائي' : 'المبلغ المستحق للمورد'}
                   </label>
-                  <input 
-                    type="number"
+                  <NumericInput 
                     value={newContact.type === 'customer' ? newContact.debt : newContact.balance}
-                    onChange={(e) => setNewContact(prev => ({ ...prev, [newContact.type === 'customer' ? 'debt' : 'balance']: parseFloat(e.target.value) || 0 }))}
+                    onChange={(val: string) => setNewContact(prev => ({ ...prev, [newContact.type === 'customer' ? 'debt' : 'balance']: parseFloat(val) || 0 }))}
                     className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-right font-bold outline-none focus:ring-2 focus:ring-primary/20"
                     placeholder="0.00"
                   />
@@ -834,69 +1164,140 @@ const Contacts = ({ contacts, onPay, onAdd, onDelete }: {
 
       {/* History Modal */}
       <AnimatePresence>
-        {historyId && selectedForHistory && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-xl z-[70] flex items-center justify-center p-6 md:p-12">
-             <motion.div 
-               initial={{ y: 50, opacity: 0 }}
-               animate={{ y: 0, opacity: 1 }}
-               exit={{ y: 50, opacity: 0 }}
-               className="bg-sidebar w-full max-w-2xl rounded-[40px] border border-white/10 overflow-hidden flex flex-col max-h-[80vh] shadow-[0_50px_100px_rgba(0,0,0,0.5)]"
-             >
-                <div className="p-10 border-b border-white/5 bg-white/[0.02] flex justify-between items-center">
-                   <div className="flex items-center gap-4">
-                      <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center text-black font-black text-lg", selectedForHistory.color || "bg-primary")}>
-                         {selectedForHistory.initial || selectedForHistory.name[0]}
-                      </div>
-                      <div>
-                         <h3 className="text-xl font-bold text-white">{selectedForHistory.name}</h3>
-                         <p className="text-[10px] text-white/30 uppercase font-black tracking-widest">
-                           {selectedForHistory.type === 'customer' ? 'سجل معاملات العميل' : 'سجل استحقاقات المورد'}
-                         </p>
-                      </div>
-                   </div>
-                   <button onClick={() => setHistoryId(null)} className="w-10 h-10 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-white/40 hover:text-white transition-all">
-                      ✕
-                   </button>
-                </div>
+        {historyId && selectedForHistory && (() => {
+          const history = selectedForHistory.history || [];
+          const totalPaid = history.filter((h: any) => h.amount > 0).reduce((acc: number, h: any) => acc + h.amount, 0);
+          const totalBorrowed = history.filter((h: any) => h.amount < 0).reduce((acc: number, h: any) => acc + Math.abs(h.amount), 0);
+          
+          return (
+            <div className="fixed inset-0 bg-black/90 backdrop-blur-3xl z-[70] flex items-center justify-center p-2 sm:p-4 md:p-8">
+               <motion.div 
+                 initial={{ y: 50, opacity: 0, scale: 0.98 }}
+                 animate={{ y: 0, opacity: 1, scale: 1 }}
+                 exit={{ y: 50, opacity: 0, scale: 0.98 }}
+                 className="bg-sidebar w-full max-w-4xl rounded-[32px] md:rounded-[48px] border border-white/10 overflow-hidden flex flex-col max-h-[95vh] md:max-h-[90vh] shadow-[0_50px_100px_rgba(0,0,0,0.8)]"
+               >
+                  {/* Modal Header */}
+                  <div className="p-6 md:p-10 border-b border-white/5 bg-white/[0.03] relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-[100px] -mr-48 -mt-48 pointer-events-none"></div>
+                    
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative z-10 text-right">
+                       <div className="flex items-center gap-4 md:gap-6 w-full md:w-auto">
+                          <div className={cn("w-16 h-16 md:w-24 md:h-24 rounded-2xl md:rounded-[32px] flex items-center justify-center text-black font-black text-xl md:text-3xl shadow-2xl rotate-3 shrink-0", selectedForHistory.color || "bg-primary")}>
+                             {selectedForHistory.initial || selectedForHistory.name[0]}
+                          </div>
+                          <div className="flex flex-col gap-1 min-w-0">
+                             <h3 className="text-xl md:text-3xl font-black text-white tracking-tight uppercase truncate">{selectedForHistory.name}</h3>
+                             <div className="flex flex-wrap items-center gap-2 md:gap-3">
+                                <span className={cn("px-2 py-0.5 rounded text-[8px] md:text-[10px] font-black uppercase tracking-widest", selectedForHistory.type === 'customer' ? "bg-red-500/20 text-red-400" : "bg-emerald-500/20 text-emerald-400")}>
+                                  {selectedForHistory.type === 'customer' ? 'عميل نشط' : 'مورد معتمد'}
+                                </span>
+                                <span className="text-[8px] md:text-[10px] text-white/20 font-black flex items-center gap-1">
+                                  <Calendar size={10} />
+                                  منذ: {selectedForHistory.date || 'غير متوفر'}
+                                </span>
+                             </div>
+                          </div>
+                       </div>
+                       
+                       <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-start w-full md:w-auto p-4 md:p-0 bg-white/5 md:bg-transparent rounded-2xl border border-white/5 md:border-none">
+                          <div className="flex flex-col md:items-end">
+                            <span className="text-[9px] md:text-[10px] text-white/30 uppercase font-black tracking-widest hidden md:block">الرصيد النهائي</span>
+                            <span className={cn("text-2xl md:text-4xl font-black tracking-tighter leading-none", selectedForHistory.type === 'customer' ? "text-red-400" : "text-primary")}>
+                               {formatCurrency(selectedForHistory.type === 'customer' ? selectedForHistory.debt : selectedForHistory.balance)}
+                            </span>
+                          </div>
+                          <span className="text-[8px] md:text-[10px] text-white/20 italic md:mt-2">آخر تحديث: {history.length > 0 ? history[0].date : 'لا يوجد'}</span>
+                       </div>
+                    </div>
 
-                <div className="flex-1 overflow-y-auto p-10 space-y-6">
-                   {(!selectedForHistory.history || selectedForHistory.history.length === 0) ? (
-                     <div className="h-60 flex flex-col items-center justify-center text-white/20 gap-4 italic">
-                        <BarChart3 size={48} strokeWidth={1} />
-                        <p>لا توجد سجلات عمليات سابقة لهذا العميل</p>
-                     </div>
-                   ) : (
-                     <div className="space-y-4">
-                        {selectedForHistory.history.map((entry: any, i: number) => (
-                           <div key={i} className="bg-white/5 border border-white/5 rounded-3xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 group hover:bg-white/[0.07] transition-all">
-                              <div>
-                                 <p className="text-white font-bold mb-1">{entry.description}</p>
-                                 <p className="text-[10px] text-white/30 italic">{entry.date}</p>
-                              </div>
-                              <div className="text-left">
-                                 <p className={cn("text-lg font-black tracking-tight", entry.amount > 0 ? "text-emerald-400" : "text-red-400")}>
-                                    {entry.amount > 0 ? '+' : ''}{formatCurrency(entry.amount)}
-                                 </p>
-                                 <p className="text-[8px] text-white/20 uppercase font-black tracking-tighter">الرصيد بعد العملية: {formatCurrency(entry.balance)}</p>
-                              </div>
-                           </div>
-                        ))}
-                     </div>
-                   )}
-                </div>
+                    <button 
+                      onClick={() => setHistoryId(null)} 
+                      className="absolute top-4 left-4 md:top-8 md:left-8 w-10 h-10 md:w-12 md:h-12 bg-white/5 hover:bg-red-500/20 hover:text-red-500 border border-white/10 rounded-xl md:rounded-2xl flex items-center justify-center text-white/40 transition-all group"
+                    >
+                       <X size={18} className="group-hover:rotate-90 transition-transform" />
+                    </button>
+                  </div>
 
-                <div className="p-8 border-t border-white/5 bg-black/20 flex justify-between items-center">
-                   <p className="text-[10px] font-black text-white/20 uppercase tracking-widest leading-none">الملخص النهائي للحساب</p>
-                   <div className="flex items-center gap-4">
-                      <span className="text-sm font-bold text-white/40 italic">الرصيد الحالي:</span>
-                      <span className={cn("text-2xl font-black tracking-tighter", selectedForHistory.type === 'customer' ? "text-red-400" : "text-primary")}>
-                         {formatCurrency(selectedForHistory.type === 'customer' ? selectedForHistory.debt : selectedForHistory.balance)}
-                      </span>
-                   </div>
-                </div>
-             </motion.div>
-          </div>
-        )}
+                  {/* Summary Stats Grid */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 p-4 md:p-8 bg-black/20 border-b border-white/5">
+                    <div className="bg-white/[0.02] border border-white/5 p-3 md:p-5 rounded-2xl md:rounded-3xl flex flex-col gap-1 text-right">
+                      <span className="text-[8px] md:text-[9px] text-white/30 uppercase font-black">إجمالي المسدد</span>
+                      <span className="text-sm md:text-lg font-black text-emerald-400">{formatCurrency(totalPaid)}</span>
+                    </div>
+                    <div className="bg-white/[0.02] border border-white/5 p-3 md:p-5 rounded-2xl md:rounded-3xl flex flex-col gap-1 text-right">
+                      <span className="text-[8px] md:text-[9px] text-white/30 uppercase font-black">إجمالي الدين</span>
+                      <span className="text-sm md:text-lg font-black text-red-400">{formatCurrency(totalBorrowed)}</span>
+                    </div>
+                    <div className="bg-white/[0.02] border border-white/5 p-3 md:p-5 rounded-2xl md:rounded-3xl flex flex-col gap-1 text-right">
+                      <span className="text-[8px] md:text-[9px] text-white/30 uppercase font-black">عدد العمليات</span>
+                      <span className="text-sm md:text-lg font-black text-white">{history.length}</span>
+                    </div>
+                    <div className="bg-white/[0.02] border border-white/5 p-3 md:p-5 rounded-2xl md:rounded-3xl flex flex-col gap-1 text-right">
+                      <span className="text-[8px] md:text-[9px] text-white/30 uppercase font-black">متوسط المعاملة</span>
+                      <span className="text-sm md:text-lg font-black text-primary truncate">{formatCurrency(history.length > 0 ? (totalPaid + totalBorrowed) / history.length : 0)}</span>
+                    </div>
+                  </div>
+
+                  {/* History Timeline */}
+                  <div className="flex-1 overflow-y-auto p-4 md:p-10 space-y-6 custom-scrollbar text-right">
+                    <div className="flex justify-between items-center mb-2 md:mb-4">
+                      <h4 className="text-[10px] md:text-xs font-black uppercase tracking-widest text-white/40">سجل المعاملات التفصيلي</h4>
+                      <div className="h-px flex-1 mx-4 md:mx-6 bg-white/5"></div>
+                    </div>
+
+                    {history.length === 0 ? (
+                      <div className="h-40 md:h-60 flex flex-col items-center justify-center text-white/20 gap-4 italic bg-white/[0.02] rounded-3xl md:rounded-[40px] border border-dashed border-white/10">
+                         <BarChart3 size={32} md:size={48} strokeWidth={1} />
+                         <p className="font-medium text-xs md:text-sm">لا توجد سجلات عمليات موثقة لهذا الحساب</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3 md:space-y-4">
+                         {history.map((entry: any, i: number) => (
+                            <div key={i} className="bg-white/5 border border-white/5 rounded-2xl md:rounded-[32px] p-5 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-6 group hover:bg-white/[0.08] hover:border-white/10 transition-all relative overflow-hidden">
+                               <div className="absolute top-0 right-0 w-1 h-full bg-primary/20 group-hover:bg-primary transition-all"></div>
+                               <div className="flex items-center gap-4 md:gap-6">
+                                  <div className={cn("w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center shrink-0", entry.amount > 0 ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500")}>
+                                     {entry.amount > 0 ? <TrendingUp size={16} md:size={20} /> : <TrendingDown size={16} md:size={20} />}
+                                  </div>
+                                  <div className="flex flex-col gap-0.5 md:gap-1">
+                                     <p className="text-white font-bold text-sm md:text-lg group-hover:text-primary transition-colors leading-tight">{entry.description}</p>
+                                     <p className="text-[8px] md:text-[10px] text-white/30 flex items-center gap-1.5">
+                                       <Calendar size={10} />
+                                       {entry.date}
+                                     </p>
+                                  </div>
+                               </div>
+                               <div className="flex flex-row-reverse md:flex-col items-center md:items-end justify-between md:justify-start w-full md:w-auto gap-1">
+                                  <div className={cn("text-lg md:text-2xl font-black tracking-tighter", entry.amount > 0 ? "text-emerald-400" : "text-red-400")}>
+                                     {entry.amount > 0 ? '+' : '-'}{formatCurrency(Math.abs(entry.amount))}
+                                  </div>
+                                  <div className="flex items-center gap-1.5 md:gap-2 bg-white/5 px-2 md:px-3 py-0.5 md:py-1 rounded-full border border-white/5">
+                                    <span className="text-[8px] md:text-[9px] text-white/20 font-black uppercase">الرصيد</span>
+                                    <span className="text-[9px] md:text-[10px] text-white/60 font-bold tracking-tight">{formatCurrency(entry.balance)}</span>
+                                  </div>
+                               </div>
+                            </div>
+                         ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Modal Footer */}
+                  <div className="p-4 md:p-8 border-t border-white/5 bg-white/[0.02] flex flex-col sm:flex-row justify-between items-center gap-4 md:gap-6">
+                    <div className="hidden sm:flex items-center gap-4 text-white/40 italic text-[10px] md:text-sm font-medium">
+                      <CheckCircle2 size={14} md:size={16} className="text-emerald-500" />
+                      البيانات موثقة ومؤمنة في النظام
+                    </div>
+                    <div className="flex items-center gap-2 md:gap-3 w-full sm:w-auto">
+                      <button className="flex-1 sm:flex-none px-4 md:px-6 py-2.5 md:py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl md:rounded-2xl text-[10px] md:text-xs font-black text-white uppercase tracking-widest transition-all">تحميل</button>
+                      <button onClick={() => setHistoryId(null)} className="flex-[2] sm:flex-none px-6 md:px-10 py-2.5 md:py-3 bg-primary text-black rounded-xl md:rounded-2xl text-[10px] md:text-xs font-black uppercase tracking-widest hover:bg-primary/90 transition-all shadow-lg shadow-primary/20">إغلاق</button>
+                    </div>
+                  </div>
+               </motion.div>
+            </div>
+          );
+        })()}
       </AnimatePresence>
 
       {/* Payment Modal */}
@@ -907,15 +1308,25 @@ const Contacts = ({ contacts, onPay, onAdd, onDelete }: {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-sidebar w-full max-w-sm rounded-[40px] border border-white/10 p-10 flex flex-col gap-6 shadow-2xl"
+              className="bg-sidebar w-full max-w-sm rounded-[32px] md:rounded-[40px] border border-white/10 p-6 md:p-10 flex flex-col gap-6 shadow-2xl"
             >
-              <h3 className="text-xl font-bold text-white text-center">تسجيل دفعة مالية</h3>
-              <p className="text-white/40 text-sm text-center italic">تحويل مالي لـ {contacts.find(c => c.id === selectedId)?.name}</p>
+              <h3 className="text-xl font-bold text-white text-center">
+                {paymentMode === 'pay' ? 'تسجيل سداد مالي' : 'تسجيل مديونية جديدة'}
+              </h3>
+              <p className="text-white/40 text-xs md:text-sm text-center italic px-2">
+                {paymentMode === 'pay' 
+                  ? (contacts.find(c => c.id === selectedId)?.type === 'customer' ? 'تحصيل مبلغ من: ' : 'دفع مبلغ لـ: ') 
+                  : 'زيادة رصيد مديونية: '}
+                {contacts.find(c => c.id === selectedId)?.name}
+              </p>
               <div className="space-y-4">
-                <input 
-                  type="number"
+                <div className="flex bg-white/5 p-1 rounded-xl border border-white/5">
+                  <button onClick={() => setPaymentMode('pay')} className={cn("flex-1 py-2 text-[10px] font-black uppercase rounded-lg transition-all", paymentMode === 'pay' ? "bg-primary text-black" : "text-white/40")}>سداد</button>
+                  <button onClick={() => setPaymentMode('debt')} className={cn("flex-1 py-2 text-[10px] font-black uppercase rounded-lg transition-all", paymentMode === 'debt' ? "bg-red-500/20 text-red-500" : "text-white/40")}>مديونية</button>
+                </div>
+                <NumericInput 
                   value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
+                  onChange={(val: string) => setAmount(val)}
                   className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-center font-bold text-2xl outline-none focus:ring-2 focus:ring-primary/20"
                   placeholder="0.00"
                   autoFocus
@@ -976,8 +1387,8 @@ const Inventory = ({ inventory, onUpdate, onAdd, onDelete }: any) => {
     <div className="flex flex-col gap-10 animate-in zoom-in-95 duration-700">
       <div className="flex flex-col sm:flex-row justify-between items-end gap-6">
         <div>
-          <h1 className="text-4xl font-light text-white mb-2">إدارة <span className="font-medium text-primary">المواد الخام الاستراتيجية</span></h1>
-          <p className="text-white/40 text-sm font-light italic">مراقبة مستويات الوقود والدقيق والسلع الأساسية في الوقت الفعلي</p>
+          <h1 className="text-4xl font-light text-on-surface mb-2">إدارة <span className="font-medium text-primary">المواد الخام الاستراتيجية</span></h1>
+          <p className="text-on-surface-muted text-sm font-light italic">مراقبة مستويات الوقود والدقيق والسلع الأساسية في الوقت الفعلي</p>
         </div>
         <button 
           onClick={() => setShowAddModal(true)}
@@ -997,7 +1408,7 @@ const Inventory = ({ inventory, onUpdate, onAdd, onDelete }: any) => {
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-right border-collapse">
-            <thead className="bg-black/20 text-white/30 text-[10px] font-black uppercase tracking-widest">
+            <thead className="bg-on-surface/5 text-on-surface-muted text-[10px] font-black uppercase tracking-widest">
               <tr>
                 <th className="py-6 px-10">المادة</th>
                 <th className="py-6 px-10 text-center">المؤشر</th>
@@ -1018,8 +1429,8 @@ const Inventory = ({ inventory, onUpdate, onAdd, onDelete }: any) => {
                         <item.icon size={22} />
                       </div>
                       <div className="flex flex-col">
-                        <span className="font-bold text-white group-hover/btn:text-primary transition-colors">{item.name}</span>
-                        <span className="text-[8px] text-white/20 uppercase font-black group-hover/btn:text-white/40">عرض البيانات التحليلية</span>
+                        <span className="font-bold text-on-surface group-hover/btn:text-primary transition-colors">{item.name}</span>
+                        <span className="text-[8px] text-on-surface-muted uppercase font-black group-hover/btn:text-on-surface">عرض البيانات التحليلية</span>
                       </div>
                     </button>
                   </td>
@@ -1110,14 +1521,14 @@ const Inventory = ({ inventory, onUpdate, onAdd, onDelete }: any) => {
        {/* Item Details Modal */}
        <AnimatePresence>
          {selectedItemForDetails && (
-           <div className="fixed inset-0 bg-black/90 backdrop-blur-3xl z-[80] flex items-center justify-center p-6">
+           <div className="fixed inset-0 bg-black/90 backdrop-blur-3xl z-[80] flex items-center justify-center p-2 sm:p-4 md:p-8">
              <motion.div 
-               initial={{ scale: 0.95, opacity: 0 }}
-               animate={{ scale: 1, opacity: 1 }}
-               exit={{ scale: 0.95, opacity: 0 }}
-               className="bg-sidebar w-full max-w-lg rounded-[48px] border border-white/10 overflow-hidden shadow-2xl"
+               initial={{ scale: 0.98, opacity: 0, y: 20 }}
+               animate={{ scale: 1, opacity: 1, y: 0 }}
+               exit={{ scale: 0.98, opacity: 0, y: 20 }}
+               className="bg-sidebar w-full max-w-xl rounded-[32px] md:rounded-[48px] border border-white/10 overflow-hidden shadow-2xl flex flex-col max-h-[95vh] md:max-h-[80vh]"
              >
-                <div className="p-12 flex flex-col gap-10">
+                <div className="p-6 md:p-12 flex flex-col gap-8 md:gap-10 overflow-y-auto custom-scrollbar text-right">
                    <div className="flex justify-between items-start">
                       <div className="flex items-center gap-6">
                          <div className="w-20 h-20 bg-primary rounded-3xl flex items-center justify-center text-black">
@@ -1170,8 +1581,8 @@ const Inventory = ({ inventory, onUpdate, onAdd, onDelete }: any) => {
                                       {h.type === 'addition' ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
                                    </div>
                                    <div className="flex flex-col">
-                                      <span className="text-[10px] text-white font-bold">{h.type === 'addition' ? 'توريد كمية' : 'سحب كمية'}</span>
-                                      <span className="text-[10px] text-white/30">{h.date}</span>
+                                      <span className="text-[10px] text-on-surface font-bold">{h.type === 'addition' ? 'توريد كمية' : 'سحب كمية'}</span>
+                                      <span className="text-[10px] text-on-surface-muted">{h.date}</span>
                                    </div>
                                 </div>
                                 <div className="text-right">
@@ -1236,10 +1647,9 @@ const Inventory = ({ inventory, onUpdate, onAdd, onDelete }: any) => {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-[10px] uppercase font-black tracking-widest text-white/30 px-2 block">الكمية الابتدائية</label>
-                    <input 
-                      type="number"
+                    <NumericInput 
                       value={newItem.quantity}
-                      onChange={(e) => setNewItem(prev => ({ ...prev, quantity: parseFloat(e.target.value) || 0 }))}
+                      onChange={(val: string) => setNewItem(prev => ({ ...prev, quantity: parseFloat(val) || 0 }))}
                       className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-right font-bold outline-none focus:ring-2 focus:ring-primary/20"
                       placeholder="0"
                     />
@@ -1257,10 +1667,9 @@ const Inventory = ({ inventory, onUpdate, onAdd, onDelete }: any) => {
 
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase font-black tracking-widest text-white/30 px-2 block">متوسط سعر التكلفة للوحدة</label>
-                  <input 
-                    type="number"
+                  <NumericInput 
                     value={newItem.price}
-                    onChange={(e) => setNewItem(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
+                    onChange={(val: string) => setNewItem(prev => ({ ...prev, price: parseFloat(val) || 0 }))}
                     className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-right font-bold outline-none focus:ring-2 focus:ring-primary/20"
                     placeholder="0.00"
                   />
@@ -1319,10 +1728,9 @@ const Inventory = ({ inventory, onUpdate, onAdd, onDelete }: any) => {
               <div className="space-y-4 pt-4 border-t border-white/5">
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase font-black tracking-widest text-white/30 px-2 block">الكمية {mode === 'restock' ? 'المشتراة' : 'المسحوبة'}</label>
-                  <input 
-                    type="number"
+                  <NumericInput 
                     value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
+                    onChange={(val: string) => setAmount(val)}
                     className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-center font-black text-2xl outline-none focus:ring-2 focus:ring-primary/20"
                     placeholder="0"
                     autoFocus
@@ -1332,10 +1740,9 @@ const Inventory = ({ inventory, onUpdate, onAdd, onDelete }: any) => {
                   <div className="space-y-2">
                     <label className="text-[10px] uppercase font-black tracking-widest text-white/30 px-2 block">إجمالي قيمة الشراء</label>
                     <div className="relative">
-                      <input 
-                        type="number"
+                      <NumericInput 
                         value={price}
-                        onChange={(e) => setPrice(e.target.value)}
+                        onChange={(val: string) => setPrice(val)}
                         className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-center font-black text-2xl outline-none focus:ring-2 focus:ring-primary/20"
                         placeholder="0.00"
                       />
@@ -1446,9 +1853,29 @@ export default function App() {
   const [user, setUser] = React.useState<User | null>(null);
   const [authReady, setAuthReady] = React.useState(false);
   const [view, setView] = React.useState<View>('dashboard');
+  const [theme, setTheme] = React.useState<'dark' | 'light'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('theme');
+      return (saved as 'dark' | 'light') || 'dark';
+    }
+    return 'dark';
+  });
+
+  React.useEffect(() => {
+    const root = window.document.documentElement;
+    if (theme === 'light') {
+      root.classList.add('light');
+    } else {
+      root.classList.remove('light');
+    }
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
   const [transactions, setTransactions] = React.useState<Transaction[]>([]);
   const [contacts, setContacts] = React.useState<any[]>([]);
   const [inventory, setInventory] = React.useState<any[]>([]);
+  const [financeCategories, setFinanceCategories] = React.useState<any[]>([]);
   const [loadingData, setLoadingData] = React.useState(true);
 
   React.useEffect(() => {
@@ -1471,13 +1898,33 @@ export default function App() {
     const transactionsQuery = query(
       collection(db, 'transactions'),
       where('userId', '==', user.uid),
-      orderBy('date', 'desc')
+      orderBy('timestamp', 'desc')
     );
 
     const unsubscribeTransactions = onSnapshot(transactionsQuery, (snapshot) => {
       setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
       setLoadingData(false);
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'transactions'));
+
+    const categoriesQuery = query(
+      collection(db, 'financeCategories'),
+      where('userId', '==', user.uid)
+    );
+
+    const unsubscribeCategories = onSnapshot(categoriesQuery, (snapshot) => {
+      if (snapshot.empty) {
+        const defaultCategories = [
+          { name: 'مشتريات خامات', type: 'expense', userId: user.uid },
+          { name: 'رواتب موظفين', type: 'expense', userId: user.uid },
+          { name: 'كهرباء ومياه', type: 'expense', userId: user.uid },
+          { name: 'صيانة ومعدات', type: 'expense', userId: user.uid },
+          { name: 'مبيعات يومية', type: 'income', userId: user.uid },
+        ];
+        defaultCategories.forEach(c => addDoc(collection(db, 'financeCategories'), c));
+      } else {
+        setFinanceCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
+      }
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'financeCategories'));
 
     const contactsQuery = query(
       collection(db, 'contacts'),
@@ -1532,16 +1979,49 @@ export default function App() {
       unsubscribeTransactions();
       unsubscribeContacts();
       unsubscribeInventory();
+      unsubscribeCategories();
     };
   }, [user]);
 
-  const addTransaction = async (data: Omit<Transaction, 'id' | 'date'>) => {
+  const addFinanceCategory = async (name: string, type: 'income' | 'expense') => {
+    if (!user) return;
+    try {
+      await addDoc(collection(db, 'financeCategories'), {
+        name,
+        type,
+        userId: user.uid
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'financeCategories');
+    }
+  };
+
+  const updateFinanceCategory = async (id: string, name: string) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, 'financeCategories', id), { name });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'financeCategories');
+    }
+  };
+
+  const deleteFinanceCategory = async (id: string) => {
+    if (!user) return;
+    try {
+      await deleteDoc(doc(db, 'financeCategories', id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, 'financeCategories');
+    }
+  };
+
+  const addTransaction = async (data: Omit<Transaction, 'id' | 'date' | 'timestamp'>) => {
     if (!user) return;
     const date = new Date().toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' }) + ' ' + new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
     try {
       await addDoc(collection(db, 'transactions'), {
         ...data,
         date,
+        timestamp: Date.now(),
         userId: user.uid
       });
     } catch (error) {
@@ -1591,7 +2071,7 @@ export default function App() {
     }
   };
 
-  const handlePayment = async (id: string, amount: number, isSupplier: boolean) => {
+  const handlePayment = async (id: string, amount: number, isSupplier: boolean, isDebtIncrease: boolean = false) => {
     if (!user) return;
     const contact = contacts.find(c => c.id === id);
     if (!contact) return;
@@ -1599,24 +2079,40 @@ export default function App() {
     const date = new Date().toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' }) + ' ' + new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
     
     if (isSupplier) {
-      const newHistory = [...(contact.history || []), { date, description: 'دفع مبلغ للمورد', amount: -amount, balance: (contact.balance || 0) - amount }];
+      const adjustment = isDebtIncrease ? amount : -amount;
+      const description = isDebtIncrease ? 'توريد بضاعة بالدين' : 'دفع مبلغ للمورد';
+      const newHistory = [...(contact.history || []), { date, description, amount: adjustment, balance: (contact.balance || 0) + adjustment }];
       try {
         await updateDoc(doc(db, 'contacts', id), {
-          balance: Math.max(0, (contact.balance || 0) - amount),
+          balance: Math.max(0, (contact.balance || 0) + adjustment),
           history: newHistory
         });
-        addTransaction({ description: `سداد مورد: ${contact.name}`, amount, type: 'expense', category: 'payment' });
+        if (!isDebtIncrease) {
+          addTransaction({ description: `سداد مورد: ${contact.name}`, amount, type: 'expense', category: 'payment' });
+        } else {
+          // If it's a debt increase (receiving supplies without paying), it's conceptually an expense that will be paid later.
+          // But usually, we only record cash transactions in the finance section. 
+          // However, user specifically asked for "sync with expenses".
+          addTransaction({ description: `زيادة مديونية مورد: ${contact.name}`, amount, type: 'expense', category: 'debt' });
+        }
       } catch (error) {
         handleFirestoreError(error, OperationType.UPDATE, `contacts/${id}`);
       }
     } else {
-      const newHistory = [...(contact.history || []), { date, description: 'تحصيل مبلغ من العميل', amount: -amount, balance: (contact.debt || 0) - amount }];
+      const adjustment = isDebtIncrease ? amount : -amount;
+      const description = isDebtIncrease ? 'تسجيل مديونية جديدة' : 'تحصيل مبلغ من العميل';
+      const newHistory = [...(contact.history || []), { date, description, amount: adjustment, balance: (contact.debt || 0) + adjustment }];
       try {
         await updateDoc(doc(db, 'contacts', id), {
-          debt: Math.max(0, (contact.debt || 0) - amount),
+          debt: Math.max(0, (contact.debt || 0) + adjustment),
           history: newHistory
         });
-        addTransaction({ description: `تحصيل دين: ${contact.name}`, amount, type: 'income', category: 'debt' });
+        if (!isDebtIncrease) {
+          addTransaction({ description: `تحصيل دين: ${contact.name}`, amount, type: 'income', category: 'debt' });
+        } else {
+          // New debt usually means a sale that wasn't paid for.
+          addTransaction({ description: `تسجيل مديونية عميل: ${contact.name}`, amount, type: 'income', category: 'sale' });
+        }
       } catch (error) {
         handleFirestoreError(error, OperationType.UPDATE, `contacts/${id}`);
       }
@@ -1702,11 +2198,11 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-bakery-surface text-right font-sans" dir="rtl">
-      <Sidebar activeView={view} setView={setView} user={user} />
+    <div className="min-h-screen bg-bakery-surface text-right font-sans transition-colors duration-300" dir="rtl">
+      <Sidebar activeView={view} setView={setView} user={user} theme={theme} toggleTheme={toggleTheme} />
       
       <div className="lg:pr-72 min-h-screen flex flex-col">
-        <TopBar netValue={netValue} />
+        <TopBar netValue={netValue} theme={theme} toggleTheme={toggleTheme} />
         
         <main className="flex-1 p-6 lg:p-12 pb-24 overflow-hidden">
           <AnimatePresence mode="wait">
@@ -1728,7 +2224,15 @@ export default function App() {
               ) : (
                 <>
                   {view === 'dashboard' && <Dashboard stats={{ netValue, dailyIncome, dailyExpense, totalDebt }} transactions={transactions} inventory={inventory} />}
-                  {view === 'finance' && <Finance stats={{ dailyIncome, dailyExpense }} transactions={transactions} onAdd={addTransaction} />}
+                  {view === 'finance' && (
+                    <Finance 
+                      stats={{ dailyIncome, dailyExpense }} 
+                      transactions={transactions} 
+                      categories={financeCategories}
+                      onAdd={addTransaction} 
+                      onAddCategory={addFinanceCategory}
+                    />
+                  )}
                   {view === 'contacts' && <Contacts contacts={contacts} onPay={handlePayment} onAdd={addContact} onDelete={deleteContact} />}
                   {view === 'inventory' && <Inventory inventory={inventory} onUpdate={updateInventory} onAdd={addInventoryItem} onDelete={deleteInventoryItem} />}
                   {view === 'reports' && (
@@ -1737,6 +2241,13 @@ export default function App() {
                       inventory={inventory} 
                       onEditTransaction={updateTransaction} 
                       onDeleteTransaction={deleteTransaction}
+                    />
+                  )}
+                  {view === 'categories' && (
+                    <CategoryManager 
+                      categories={financeCategories}
+                      onUpdate={updateFinanceCategory}
+                      onDelete={deleteFinanceCategory}
                     />
                   )}
                 </>
@@ -1754,6 +2265,7 @@ export default function App() {
           { id: 'inventory', icon: Package },
           { id: 'contacts', icon: Users },
           { id: 'reports', icon: BarChart3 },
+          { id: 'categories', icon: Settings2 },
         ].map((item) => (
           <button 
             key={item.id}
@@ -1772,7 +2284,9 @@ export default function App() {
 }
 
 const Reports = ({ transactions, inventory, onEditTransaction, onDeleteTransaction }: any) => {
-  const [range, setRange] = React.useState<'day' | 'week' | 'month' | 'all'>('all');
+  const [range, setRange] = React.useState<'day' | 'month' | 'custom' | 'all'>('all');
+  const [startDate, setStartDate] = React.useState('');
+  const [endDate, setEndDate] = React.useState('');
   const [editingTransaction, setEditingTransaction] = React.useState<any>(null);
   const [editForm, setEditForm] = React.useState({ description: '', amount: '' });
   
@@ -1793,21 +2307,69 @@ const Reports = ({ transactions, inventory, onEditTransaction, onDeleteTransacti
 
   const filteredTransactions = transactions.filter((t: any) => {
     if (range === 'all') return true;
-    const idx = transactions.indexOf(t);
-    if (range === 'day') return idx < 5;
-    if (range === 'week') return idx < 20;
-    if (range === 'month') return idx < 50;
+    
+    // Use timestamp for reliable filtering if available
+    const txDate = t.timestamp ? new Date(t.timestamp) : new Date();
+    const now = new Date();
+    
+    if (range === 'day') {
+      return txDate.toDateString() === now.toDateString();
+    }
+    
+    if (range === 'month') {
+      return txDate.getMonth() === now.getMonth() && txDate.getFullYear() === now.getFullYear();
+    }
+    
+    if (range === 'custom') {
+      if (!startDate || !endDate) return true;
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+      return txDate >= start && txDate <= end;
+    }
     return true;
   });
 
+  const getPreviousPeriodTotals = () => {
+    const now = new Date();
+    let prevTransactions = [];
+    
+    if (range === 'day') {
+      const yesterday = new Date(now);
+      yesterday.setDate(now.getDate() - 1);
+      prevTransactions = transactions.filter((t: any) => {
+        const txDate = t.timestamp ? new Date(t.timestamp) : new Date();
+        return txDate.toDateString() === yesterday.toDateString();
+      });
+    } else if (range === 'month') {
+      const lastMonth = new Date(now);
+      lastMonth.setMonth(now.getMonth() - 1);
+      prevTransactions = transactions.filter((t: any) => {
+        const txDate = t.timestamp ? new Date(t.timestamp) : new Date();
+        return txDate.getMonth() === lastMonth.getMonth() && txDate.getFullYear() === lastMonth.getFullYear();
+      });
+    }
+    
+    const prevIncome = prevTransactions.filter((t: any) => t.type === 'income').reduce((acc: number, t: any) => acc + t.amount, 0);
+    const prevExpense = prevTransactions.filter((t: any) => t.type === 'expense').reduce((acc: number, t: any) => acc + t.amount, 0);
+    
+    return { prevIncome, prevExpense };
+  };
+
+  const { prevIncome, prevExpense } = getPreviousPeriodTotals();
   const rangeIncome = filteredTransactions.filter((t: any) => t.type === 'income').reduce((acc: number, t: any) => acc + t.amount, 0);
   const rangeExpense = filteredTransactions.filter((t: any) => t.type === 'expense').reduce((acc: number, t: any) => acc + t.amount, 0);
+  
+  const incomeChange = prevIncome > 0 ? ((rangeIncome - prevIncome) / prevIncome * 100).toFixed(1) : null;
+  const expenseChange = prevExpense > 0 ? ((rangeExpense - prevExpense) / prevExpense * 100).toFixed(1) : null;
+  
   const inventoryValue = inventory.reduce((acc: number, item: any) => acc + (item.quantity * item.price), 0);
   
   const ranges = [
     { id: 'day', label: 'اليوم' },
-    { id: 'week', label: 'الأسبوع' },
     { id: 'month', label: 'الشهر' },
+    { id: 'custom', label: 'فترة محددة' },
     { id: 'all', label: 'الكل' },
   ];
 
@@ -1819,19 +2381,38 @@ const Reports = ({ transactions, inventory, onEditTransaction, onDeleteTransacti
           <p className="text-white/40 text-sm font-light italic">تحليل أداء رأس المال وكفاءة التشغيل للدورة الحالية</p>
         </div>
         
-        <div className="flex bg-white/5 p-1.5 rounded-2xl border border-white/10 backdrop-blur-md">
-          {ranges.map((r) => (
-            <button 
-              key={r.id}
-              onClick={() => setRange(r.id as any)}
-              className={cn(
-                "px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-                range === r.id ? "bg-primary text-black shadow-lg" : "text-white/40 hover:text-white"
-              )}
-            >
-              {r.label}
-            </button>
-          ))}
+        <div className="flex flex-col md:flex-row gap-4 items-center">
+          {range === 'custom' && (
+            <div className="flex items-center gap-2 bg-white/5 p-1.5 rounded-2xl border border-white/10 animate-in fade-in slide-in-from-top-2">
+              <input 
+                type="date" 
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="bg-transparent text-[10px] text-white outline-none border-none px-2"
+              />
+              <span className="text-white/20 text-[10px]">إلى</span>
+              <input 
+                type="date" 
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="bg-transparent text-[10px] text-white outline-none border-none px-2"
+              />
+            </div>
+          )}
+          <div className="flex bg-white/5 p-1.5 rounded-2xl border border-white/10 backdrop-blur-md">
+            {ranges.map((r) => (
+              <button 
+                key={r.id}
+                onClick={() => setRange(r.id as any)}
+                className={cn(
+                  "px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                  range === r.id ? "bg-primary text-black shadow-lg" : "text-white/40 hover:text-white"
+                )}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -1843,8 +2424,14 @@ const Reports = ({ transactions, inventory, onEditTransaction, onDeleteTransacti
             <span className="text-4xl font-black text-primary tracking-tight">{formatCurrency(rangeIncome)}</span>
           </div>
           <div className="flex items-center gap-2 mt-6 text-emerald-400 text-[10px] font-bold">
-            <TrendingUp size={14} />
-            <span>+12.4% عن الفترة السابقة</span>
+            {incomeChange ? (
+              <>
+                <TrendingUp size={14} className={parseFloat(incomeChange) < 0 ? "rotate-180 text-red-400" : ""} />
+                <span className={parseFloat(incomeChange) < 0 ? "text-red-400" : ""}>{incomeChange}% عن الفترة السابقة</span>
+              </>
+            ) : (
+              <span className="text-white/20">لا توجد بيانات مقارنة</span>
+            )}
           </div>
         </div>
 
@@ -1854,8 +2441,18 @@ const Reports = ({ transactions, inventory, onEditTransaction, onDeleteTransacti
           <div className="flex items-baseline gap-2">
             <span className="text-4xl font-black text-white tracking-tight">{formatCurrency(rangeExpense)}</span>
           </div>
-          <div className="w-full bg-white/5 h-1.5 rounded-full mt-6 overflow-hidden">
-             <div className="bg-red-500 h-full rounded-full" style={{ width: `${Math.min((rangeExpense/rangeIncome)*100, 100)}%` }}></div>
+          <div className="flex items-center gap-2 mt-6 text-red-500 text-[10px] font-bold">
+            {expenseChange ? (
+              <>
+                <TrendingDown size={14} className={parseFloat(expenseChange) < 0 ? "rotate-180 text-emerald-400" : ""} />
+                <span className={parseFloat(expenseChange) < 0 ? "text-emerald-400" : ""}>{expenseChange}% عن الفترة السابقة</span>
+              </>
+            ) : (
+              <span className="text-white/20 text-right w-full">لا توجد بيانات مقارنة</span>
+            )}
+          </div>
+          <div className="w-full bg-white/5 h-1.5 rounded-full mt-4 overflow-hidden">
+             <div className="bg-red-500 h-full rounded-full" style={{ width: `${rangeIncome > 0 ? Math.min((rangeExpense/rangeIncome)*100, 100) : 0}%` }}></div>
           </div>
         </div>
 
@@ -2000,10 +2597,9 @@ const Reports = ({ transactions, inventory, onEditTransaction, onDeleteTransacti
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase font-black tracking-widest text-white/30 px-2 block text-right">المبلغ</label>
-                  <input 
-                    type="number"
+                  <NumericInput 
                     value={editForm.amount}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, amount: e.target.value }))}
+                    onChange={(val: string) => setEditForm(prev => ({ ...prev, amount: val }))}
                     className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-right font-bold outline-none focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
