@@ -782,26 +782,32 @@ const Finance = ({ stats, transactions, categories, onAdd, onAddCategory }: any)
   );
 };
 
-const CategoryManager = ({ categories, onUpdate, onDelete }: any) => {
+const CategoryManager = ({ categories, onUpdate, onDelete, contacts, onUpdateContact, onDeleteContact }: any) => {
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [editName, setEditName] = React.useState('');
+  const [editingType, setEditingType] = React.useState<'category' | 'contact'>('category');
 
-  const handleStartEdit = (cat: any) => {
-    setEditingId(cat.id);
-    setEditName(cat.name);
+  const handleStartEdit = (item: any, type: 'category' | 'contact') => {
+    setEditingId(item.id);
+    setEditName(item.name);
+    setEditingType(type);
   };
 
   const handleSave = async (id: string) => {
     if (!editName) return;
-    await onUpdate(id, editName);
+    if (editingType === 'category') {
+      await onUpdate(id, editName);
+    } else {
+      await onUpdateContact(id, editName);
+    }
     setEditingId(null);
   };
 
   return (
     <div className="flex flex-col gap-10">
       <div className="flex flex-col gap-2">
-        <h2 className="text-4xl font-black text-white tracking-tighter">إدارة التصنيفات</h2>
-        <p className="text-white/40 font-medium italic">تحرير وحذف أصناف الإيرادات والمصروفات</p>
+        <h2 className="text-4xl font-black text-white tracking-tighter">إدارة البيانات الأساسية</h2>
+        <p className="text-white/40 font-medium italic">تحرير وحذف التصنيفات، العملاء والموردين</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -817,7 +823,7 @@ const CategoryManager = ({ categories, onUpdate, onDelete }: any) => {
                   <TrendingUp size={18} />
                 </div>
                 <div className="flex-1">
-                  {editingId === cat.id ? (
+                  {editingId === cat.id && editingType === 'category' ? (
                     <input 
                       autoFocus
                       value={editName}
@@ -831,7 +837,7 @@ const CategoryManager = ({ categories, onUpdate, onDelete }: any) => {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => handleStartEdit(cat)} className="p-2 text-white/20 hover:text-primary transition-colors">
+                  <button onClick={() => handleStartEdit(cat, 'category')} className="p-2 text-white/20 hover:text-primary transition-colors">
                     <Edit2 size={16} />
                   </button>
                   <button onClick={() => onDelete(cat.id)} className="p-2 text-white/20 hover:text-red-500 transition-colors">
@@ -855,7 +861,7 @@ const CategoryManager = ({ categories, onUpdate, onDelete }: any) => {
                   <TrendingDown size={18} />
                 </div>
                 <div className="flex-1">
-                  {editingId === cat.id ? (
+                  {editingId === cat.id && editingType === 'category' ? (
                     <input 
                       autoFocus
                       value={editName}
@@ -869,10 +875,86 @@ const CategoryManager = ({ categories, onUpdate, onDelete }: any) => {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => handleStartEdit(cat)} className="p-2 text-white/20 hover:text-primary transition-colors">
+                  <button onClick={() => handleStartEdit(cat, 'category')} className="p-2 text-white/20 hover:text-primary transition-colors">
                     <Edit2 size={16} />
                   </button>
                   <button onClick={() => onDelete(cat.id)} className="p-2 text-white/20 hover:text-red-500 transition-colors">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Customers */}
+        <div className="bg-sidebar border border-white/5 rounded-[40px] shadow-2xl overflow-hidden flex flex-col">
+          <div className="p-8 border-b border-white/5 bg-emerald-500/5 flex justify-between items-center">
+            <h3 className="text-sm font-black tracking-[0.2em] text-emerald-500 uppercase">العملاء</h3>
+          </div>
+          <div className="p-6 flex flex-col gap-4">
+            {contacts.filter((c: any) => c.type === 'customer').map((contact: any) => (
+              <div key={contact.id} className="flex items-center gap-4 p-4 rounded-[24px] bg-white/[0.02] border border-white/5 group hover:bg-white/5 transition-all">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-500 font-bold">
+                  {contact.initial}
+                </div>
+                <div className="flex-1">
+                  {editingId === contact.id && editingType === 'contact' ? (
+                    <input 
+                      autoFocus
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      onBlur={() => handleSave(contact.id)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSave(contact.id)}
+                      className="bg-white/10 border border-emerald-500/30 rounded-lg px-3 py-1 text-white text-right w-full outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  ) : (
+                    <h4 className="font-bold text-white text-right">{contact.name}</h4>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => handleStartEdit(contact, 'contact')} className="p-2 text-white/20 hover:text-primary transition-colors">
+                    <Edit2 size={16} />
+                  </button>
+                  <button onClick={() => onDeleteContact(contact.id)} className="p-2 text-white/20 hover:text-red-500 transition-colors">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Suppliers */}
+        <div className="bg-sidebar border border-white/5 rounded-[40px] shadow-2xl overflow-hidden flex flex-col">
+          <div className="p-8 border-b border-white/5 bg-blue-500/5 flex justify-between items-center">
+            <h3 className="text-sm font-black tracking-[0.2em] text-blue-500 uppercase">الموردون</h3>
+          </div>
+          <div className="p-6 flex flex-col gap-4">
+            {contacts.filter((c: any) => c.type === 'supplier').map((contact: any) => (
+              <div key={contact.id} className="flex items-center gap-4 p-4 rounded-[24px] bg-white/[0.02] border border-white/5 group hover:bg-white/5 transition-all">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-500 font-bold text-xs">
+                  {contact.name[0]}
+                </div>
+                <div className="flex-1">
+                  {editingId === contact.id && editingType === 'contact' ? (
+                    <input 
+                      autoFocus
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      onBlur={() => handleSave(contact.id)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSave(contact.id)}
+                      className="bg-white/10 border border-blue-500/30 rounded-lg px-3 py-1 text-white text-right w-full outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  ) : (
+                    <h4 className="font-bold text-white text-right">{contact.name}</h4>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => handleStartEdit(contact, 'contact')} className="p-2 text-white/20 hover:text-primary transition-colors">
+                    <Edit2 size={16} />
+                  </button>
+                  <button onClick={() => onDeleteContact(contact.id)} className="p-2 text-white/20 hover:text-red-500 transition-colors">
                     <Trash2 size={16} />
                   </button>
                 </div>
@@ -2141,6 +2223,15 @@ export default function App() {
     }
   };
 
+  const updateContact = async (id: string, name: string) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, 'contacts', id), { name, initial: name[0] });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `contacts/${id}`);
+    }
+  };
+
   const addInventoryItem = async (data: any) => {
     if (!user) return;
     try {
@@ -2248,6 +2339,9 @@ export default function App() {
                       categories={financeCategories}
                       onUpdate={updateFinanceCategory}
                       onDelete={deleteFinanceCategory}
+                      contacts={contacts}
+                      onUpdateContact={updateContact}
+                      onDeleteContact={deleteContact}
                     />
                   )}
                 </>
