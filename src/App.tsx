@@ -39,7 +39,8 @@ import {
   Sun,
   Moon,
   ChevronDown,
-  Truck
+  Truck,
+  Calculator
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -389,18 +390,26 @@ const StatusBadge = ({ status }: { status: InventoryItem['status'] }) => {
     out: "bg-red-500/10 dark:text-red-400 text-red-600 border-red-500/20"
   };
 
+  const statusIcons = {
+    available: CheckCircle2,
+    low: AlertTriangle,
+    out: XCircle
+  };
+
   const labels = {
     available: "متوفر",
     low: "منخفض",
     out: "نفذ"
   };
 
+  const Icon = statusIcons[status];
+
   return (
     <span className={cn(
       "inline-flex items-center gap-2 px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border backdrop-blur-sm",
       styles[status]
     )}>
-      <span className={cn("w-1.5 h-1.5 rounded-full shadow-[0_0_8px_currentColor]", status === 'available' ? "bg-emerald-500" : status === 'low' ? "bg-amber-500" : "bg-red-500")} />
+      <Icon size={12} strokeWidth={2.5} />
       {labels[status]}
     </span>
   );
@@ -559,15 +568,27 @@ const Dashboard = ({ stats, transactions, inventory }: any) => {
   );
 };
 
-const Finance = ({ stats, transactions, categories, onAdd, onAddCategory, contacts, onPay }: any) => {
+const Finance = ({ 
+  stats, 
+  transactions, 
+  categories, 
+  onAdd, 
+  onAddCategory, 
+  onUpdateCategory,
+  onDeleteCategory,
+  contacts, 
+  onPay 
+}: any) => {
   const [tab, setTab] = React.useState<'income' | 'expense'>('income');
   const [paymentType, setPaymentType] = React.useState<'regular' | 'supplier'>('regular');
   const [amount, setAmount] = React.useState('');
   const [selectedCategory, setSelectedCategory] = React.useState<string>('');
   const [selectedSupplierId, setSelectedSupplierId] = React.useState<string>('');
+  const [customDate, setCustomDate] = React.useState(new Date().toISOString().split('T')[0]);
   const [showCategoryPicker, setShowCategoryPicker] = React.useState(false);
   const [showAddCategory, setShowAddCategory] = React.useState(false);
   const [newCategoryName, setNewCategoryName] = React.useState('');
+  const [editingCategoryId, setEditingCategoryId] = React.useState<string | null>(null);
 
   const filteredTransactions = transactions.filter((t: any) => t.type === tab);
   const filteredCategories = categories.filter((c: any) => c.type === tab);
@@ -579,14 +600,15 @@ const Finance = ({ stats, transactions, categories, onAdd, onAddCategory, contac
     
     if (tab === 'expense' && paymentType === 'supplier') {
       if (!selectedSupplierId) return;
-      onPay(selectedSupplierId, parseFloat(amount), true);
+      onPay(selectedSupplierId, parseFloat(amount), true, false, customDate);
     } else {
       if (!selectedCategory) return;
       onAdd({
         description: selectedCategory,
         amount: parseFloat(amount),
         type: tab,
-        category: tab === 'income' ? 'sales' : 'expense'
+        category: tab === 'income' ? 'sales' : 'expense',
+        customDate: customDate
       });
     }
 
@@ -598,8 +620,15 @@ const Finance = ({ stats, transactions, categories, onAdd, onAddCategory, contac
   const handleAddCategory = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCategoryName) return;
-    onAddCategory(newCategoryName, tab);
+    
+    if (editingCategoryId) {
+      onUpdateCategory(editingCategoryId, newCategoryName);
+    } else {
+      onAddCategory(newCategoryName, tab);
+    }
+    
     setNewCategoryName('');
+    setEditingCategoryId(null);
     setShowAddCategory(false);
   };
 
@@ -731,6 +760,16 @@ const Finance = ({ stats, transactions, categories, onAdd, onAddCategory, contac
                       <Plus size={16} strokeWidth={3} />
                       إضافة تصنيف جديد
                     </button>
+
+                    <div className="space-y-4">
+                      <label className="block text-[10px] uppercase tracking-widest font-black text-on-surface-muted px-2">تاريخ القيد</label>
+                      <input 
+                        type="date"
+                        value={customDate}
+                        onChange={(e) => setCustomDate(e.target.value)}
+                        className="w-full bg-on-surface/[0.03] border border-on-surface/5 rounded-3xl px-8 py-5 outline-none font-black text-on-surface transition-all focus:ring-4 focus:ring-primary/10 focus:border-primary/40 shadow-sm"
+                      />
+                    </div>
                   </>
                 )}
               </div>
@@ -783,17 +822,32 @@ const Finance = ({ stats, transactions, categories, onAdd, onAddCategory, contac
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 overflow-y-auto pr-2 custom-scrollbar">
                   {filteredCategories.map((cat: any) => (
-                    <button
-                      key={cat.id}
-                      onClick={() => {
-                        setSelectedCategory(cat.name);
-                        setShowCategoryPicker(false);
-                      }}
-                      className="p-6 rounded-3xl bg-white/5 border border-white/10 text-right hover:border-primary/50 hover:bg-primary/5 transition-all group"
-                    >
-                      <h4 className="font-bold text-white group-hover:text-primary transition-colors">{cat.name}</h4>
-                      <p className="text-[10px] text-white/20 mt-1 uppercase font-black uppercase tracking-tighter">تصنيف معتمد</p>
-                    </button>
+                    <div key={cat.id} className="relative group/cat">
+                      <button
+                        onClick={() => {
+                          setSelectedCategory(cat.name);
+                          setShowCategoryPicker(false);
+                        }}
+                        className="w-full p-6 pr-14 rounded-3xl bg-white/5 border border-white/10 text-right hover:border-primary/50 hover:bg-primary/5 transition-all group"
+                      >
+                        <h4 className="font-bold text-white group-hover:text-primary transition-colors">{cat.name}</h4>
+                        <p className="text-[10px] text-white/20 mt-1 uppercase font-black tracking-tighter opacity-60">تصنيف معتمد</p>
+                      </button>
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-1 opacity-0 group-cat-hover:opacity-100 transition-opacity">
+                         <button 
+                          onClick={(e) => { e.stopPropagation(); setEditingCategoryId(cat.id); setNewCategoryName(cat.name); setShowAddCategory(true); }} 
+                          className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white/40 hover:text-primary transition-colors"
+                        >
+                          <Edit2 size={12} />
+                         </button>
+                         <button 
+                          onClick={(e) => { e.stopPropagation(); onDeleteCategory(cat.id); }} 
+                          className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white/40 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 size={12} />
+                         </button>
+                      </div>
+                    </div>
                   ))}
                   
                   <button 
@@ -823,8 +877,8 @@ const Finance = ({ stats, transactions, categories, onAdd, onAddCategory, contac
                 className="bg-sidebar w-full max-w-sm rounded-[40px] border border-border-subtle p-10 flex flex-col gap-8 shadow-2xl"
               >
                 <div className="flex flex-col gap-2 text-center">
-                  <h3 className="text-xl font-bold text-on-surface">إضافة صنف جديد</h3>
-                  <p className="text-on-surface-muted/30 text-xs italic">سيتم حفظ الصنف بشكل دائم في قاعدة البيانات</p>
+                  <h3 className="text-xl font-bold text-on-surface">{editingCategoryId ? 'تعديل الصنف' : 'إضافة صنف جديد'}</h3>
+                  <p className="text-on-surface-muted/30 text-xs italic">سيتم حفظ التغييرات في قاعدة البيانات</p>
                 </div>
                 
                 <form onSubmit={handleAddCategory} className="flex flex-col gap-6">
@@ -842,7 +896,7 @@ const Finance = ({ stats, transactions, categories, onAdd, onAddCategory, contac
                   <div className="grid grid-cols-2 gap-4">
                     <button 
                       type="button" 
-                      onClick={() => setShowAddCategory(false)}
+                      onClick={() => { setShowAddCategory(false); setEditingCategoryId(null); setNewCategoryName(''); }}
                       className="py-4 bg-on-surface/5 text-on-surface font-bold rounded-2xl hover:bg-on-surface/10 transition-all"
                     >
                       إلغاء
@@ -851,7 +905,7 @@ const Finance = ({ stats, transactions, categories, onAdd, onAddCategory, contac
                       type="submit"
                       className="py-4 bg-primary text-black font-bold rounded-2xl hover:bg-primary/90 transition-all"
                     >
-                      حفظ الصنف
+                      {editingCategoryId ? 'حفظ التعديل' : 'حفظ الصنف'}
                     </button>
                   </div>
                 </form>
@@ -912,10 +966,30 @@ const Finance = ({ stats, transactions, categories, onAdd, onAddCategory, contac
   );
 };
 
-const CategoryManager = ({ categories, onUpdate, onDelete, contacts, onUpdateContact, onDeleteContact }: any) => {
+const CategoryManager = ({ 
+  categories, 
+  onUpdate, 
+  onDelete, 
+  onAdd,
+  contacts, 
+  onUpdateContact, 
+  onDeleteContact,
+  onAddContact
+}: {
+  categories: any[],
+  onUpdate: (id: string, name: string) => void,
+  onDelete: (id: string) => void,
+  onAdd: (name: string, type: 'income' | 'expense') => void,
+  contacts: any[],
+  onUpdateContact: (id: string, name: string) => void,
+  onDeleteContact: (id: string) => void,
+  onAddContact: (contact: any) => void
+}) => {
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [editName, setEditName] = React.useState('');
   const [editingType, setEditingType] = React.useState<'category' | 'contact'>('category');
+  const [showAddFor, setShowAddFor] = React.useState<string | null>(null);
+  const [newName, setNewName] = React.useState('');
 
   const handleStartEdit = (item: any, type: 'category' | 'contact') => {
     setEditingId(item.id);
@@ -924,7 +998,10 @@ const CategoryManager = ({ categories, onUpdate, onDelete, contacts, onUpdateCon
   };
 
   const handleSave = async (id: string) => {
-    if (!editName) return;
+    if (!editName.trim()) {
+      setEditingId(null);
+      return;
+    }
     if (editingType === 'category') {
       await onUpdate(id, editName);
     } else {
@@ -933,185 +1010,195 @@ const CategoryManager = ({ categories, onUpdate, onDelete, contacts, onUpdateCon
     setEditingId(null);
   };
 
-  return (
-    <div className="flex flex-col gap-8 sm:gap-12 animate-in slide-in-from-right-8 duration-1000">
-      <div className="flex flex-col gap-3 border-b border-border-subtle pb-6 sm:pb-10">
-        <h2 className="text-3xl sm:text-5xl font-black text-on-surface tracking-tighter">إدارة <span className="text-primary italic">الهياكل</span></h2>
-        <p className="text-on-surface-muted text-xs sm:text-sm font-medium opacity-60 italic tracking-wide">تحرير وحذف التصنيفات، العملاء والموردين بشكل آمن</p>
+  const handleAddNew = async (type: string) => {
+    if (!newName.trim()) return;
+    
+    if (type === 'income' || type === 'expense') {
+      await onAdd(newName, type);
+    } else if (type === 'customer' || type === 'supplier') {
+      await onAddContact({
+        name: newName,
+        type: type,
+        debt: 0,
+        balance: 0,
+        initial: newName[0],
+        date: new Date().toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' }),
+        color: 'bg-primary'
+      });
+    }
+    
+    setNewName('');
+    setShowAddFor(null);
+  };
+
+  const ManagementCard = ({ 
+    title, 
+    icon: Icon, 
+    items, 
+    type, 
+    colorClass, 
+    accentColor,
+    isContact = false
+  }: any) => (
+    <div className="bg-surface-card border border-border-subtle rounded-[32px] sm:rounded-[44px] shadow-lux overflow-hidden flex flex-col group transition-all duration-500 hover:border-on-surface/10">
+      <div className={cn("p-6 sm:p-8 border-b border-border-subtle flex justify-between items-center transition-colors", colorClass)}>
+        <div className="flex items-center gap-4">
+          <div className={cn("w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg transition-transform group-hover:scale-110", accentColor)}>
+            <Icon size={22} strokeWidth={2.5} className="sm:w-6 sm:h-6" />
+          </div>
+          <h3 className="text-[10px] sm:text-xs font-black tracking-[0.2em] text-on-surface uppercase">{title}</h3>
+        </div>
+        <button 
+          onClick={() => setShowAddFor(showAddFor === type ? null : type)}
+          className="w-10 h-10 rounded-xl bg-on-surface/5 flex items-center justify-center text-on-surface-muted hover:bg-primary hover:text-black transition-all"
+        >
+          <Plus size={20} />
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
-        {/* Income Categories */}
-        <div className="bg-surface-card border border-border-subtle rounded-[32px] sm:rounded-[44px] shadow-lux overflow-hidden flex flex-col group">
-          <div className="p-6 sm:p-8 border-b border-border-subtle bg-primary/[0.03] flex justify-between items-center group-hover:bg-primary/[0.08] transition-colors">
-            <h3 className="text-[8px] sm:text-[10px] font-black tracking-[0.3em] text-primary uppercase">أصناف الإيرادات</h3>
-            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:rotate-12 transition-transform">
-              <TrendingUp size={18} strokeWidth={2.5} className="sm:w-5 sm:h-5" />
+      <div className="p-4 sm:p-6 flex flex-col gap-3 sm:gap-4 overflow-y-auto max-h-[400px] scrollbar-hide">
+        <AnimatePresence mode="popLayout">
+          {showAddFor === type && (
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="p-4 rounded-2xl bg-primary/5 border border-primary/20 flex gap-3"
+            >
+              <input 
+                autoFocus
+                placeholder="الاسم الجديد..."
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddNew(type)}
+                className="flex-1 bg-transparent border-none outline-none font-bold text-on-surface text-sm text-right"
+              />
+              <button 
+                onClick={() => handleAddNew(type)}
+                className="px-4 py-2 bg-primary text-black rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-transform"
+              >
+                إضافة
+              </button>
+            </motion.div>
+          )}
+
+          {items.length === 0 ? (
+            <div className="py-12 flex flex-col items-center justify-center text-on-surface-muted opacity-30 italic text-sm">
+              <Icon size={40} className="mb-4 opacity-50" strokeWidth={1} />
+              <p>لا توجد بيانات مسجلة</p>
             </div>
-          </div>
-          <div className="p-4 sm:p-6 flex flex-col gap-3 sm:gap-4">
-            {categories.filter((c: any) => c.type === 'income').map((cat: any) => (
-              <div key={cat.id} className="flex items-center gap-4 p-4 sm:p-5 rounded-[22px] sm:rounded-[28px] bg-on-surface/[0.02] border border-on-surface/5 group/item hover:bg-on-surface/[0.04] transition-all">
-                <div className="flex-1">
-                  {editingId === cat.id && editingType === 'category' ? (
-                    <input 
-                      autoFocus
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      onBlur={() => handleSave(cat.id)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSave(cat.id)}
-                      className="bg-on-surface/10 border border-primary/30 rounded-xl px-4 py-2 text-on-surface text-right w-full outline-none focus:ring-1 focus:ring-primary font-bold text-sm"
-                    />
+          ) : (
+            items.map((item: any) => (
+              <motion.div 
+                layout
+                key={item.id} 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="flex items-center gap-4 p-4 sm:p-5 rounded-[22px] sm:rounded-[28px] bg-on-surface/[0.02] border border-on-surface/5 group/item hover:bg-on-surface/[0.05] hover:border-on-surface/10 transition-all relative overflow-hidden"
+              >
+                {isContact && (
+                  <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-xs shadow-sm shrink-0", accentColor)}>
+                    {item.initial || item.name[0]}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  {editingId === item.id ? (
+                    <div className="flex gap-2">
+                       <input 
+                        autoFocus
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        onBlur={() => handleSave(item.id)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSave(item.id)}
+                        className="bg-on-surface/10 border border-primary/30 rounded-xl px-4 py-2 text-on-surface text-right w-full outline-none focus:ring-1 focus:ring-primary font-bold text-sm"
+                      />
+                    </div>
                   ) : (
-                    <h4 className="font-bold text-on-surface text-right tracking-tight text-sm sm:text-base">{cat.name}</h4>
+                    <h4 className="font-bold text-on-surface text-right tracking-tight text-sm sm:text-base truncate">{item.name}</h4>
                   )}
                 </div>
-                <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-item-hover:opacity-100 transition-opacity">
-                  <button onClick={() => handleStartEdit(cat, 'category')} className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-lg text-on-surface/20 hover:text-primary hover:bg-primary/10 transition-all">
+                <div className="flex items-center gap-1 opacity-100 transition-opacity">
+                  <button 
+                    onClick={() => handleStartEdit(item, isContact ? 'contact' : 'category')} 
+                    className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-lg text-on-surface-muted/60 hover:text-primary hover:bg-primary/10 transition-all"
+                  >
                     <Edit2 size={14} className="sm:w-4 sm:h-4" />
                   </button>
-                  <button onClick={() => onDelete(cat.id)} className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-lg text-on-surface/20 hover:text-red-500 hover:bg-red-500/10 transition-all">
+                  <button 
+                    onClick={() => isContact ? onDeleteContact(item.id) : onDelete(item.id)} 
+                    className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-lg text-on-surface-muted/60 hover:text-red-500 hover:bg-red-500/10 transition-all"
+                  >
                     <Trash2 size={14} className="sm:w-4 sm:h-4" />
                   </button>
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
+              </motion.div>
+            ))
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
 
-        {/* Expense Categories */}
-        <div className="bg-surface-card border border-border-subtle rounded-[44px] shadow-lux overflow-hidden flex flex-col group">
-          <div className="p-8 border-b border-border-subtle bg-red-500/[0.03] flex justify-between items-center group-hover:bg-red-500/[0.08] transition-colors">
-            <h3 className="text-[10px] font-black tracking-[0.3em] text-red-500 uppercase">أصناف المصروفات</h3>
-            <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center text-red-500 group-hover:-rotate-12 transition-transform">
-              <TrendingDown size={20} strokeWidth={2.5} />
-            </div>
-          </div>
-          <div className="p-6 flex flex-col gap-4">
-            {categories.filter((c: any) => c.type === 'expense').map((cat: any) => (
-              <div key={cat.id} className="flex items-center gap-4 p-5 rounded-[28px] bg-on-surface/[0.02] border border-on-surface/5 group/item hover:bg-on-surface/[0.04] transition-all">
-                <div className="flex-1">
-                  {editingId === cat.id && editingType === 'category' ? (
-                    <input 
-                      autoFocus
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      onBlur={() => handleSave(cat.id)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSave(cat.id)}
-                      className="bg-on-surface/10 border border-red-500/30 rounded-xl px-4 py-2 text-on-surface text-right w-full outline-none focus:ring-1 focus:ring-red-500 font-bold"
-                    />
-                  ) : (
-                    <h4 className="font-bold text-on-surface text-right tracking-tight">{cat.name}</h4>
-                  )}
-                </div>
-                <div className="flex items-center gap-1 opacity-0 group-item-hover:opacity-100 transition-opacity">
-                  <button onClick={() => handleStartEdit(cat, 'category')} className="w-9 h-9 flex items-center justify-center rounded-lg text-on-surface/20 hover:text-primary hover:bg-primary/10 transition-all">
-                    <Edit2 size={16} />
-                  </button>
-                  <button onClick={() => onDelete(cat.id)} className="w-9 h-9 flex items-center justify-center rounded-lg text-on-surface/20 hover:text-red-500 hover:bg-red-500/10 transition-all">
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+  return (
+    <div className="flex flex-col gap-8 sm:gap-12 animate-in slide-in-from-right-8 duration-1000 pb-24">
+      <div className="flex flex-col gap-3 border-b border-border-subtle pb-6 sm:pb-10">
+        <h2 className="text-3xl sm:text-5xl font-black text-on-surface tracking-tighter">إدارة <span className="text-primary italic">الهياكل</span></h2>
+        <p className="text-on-surface-muted text-xs sm:text-sm font-medium opacity-60 italic tracking-wide">تحرير، إضافة، وحذف التصنيفات والجهات الفاعلة في النظام</p>
+      </div>
 
-        {/* Customers */}
-        <div className="bg-surface-card border border-border-subtle rounded-[44px] shadow-lux overflow-hidden flex flex-col group">
-          <div className="p-8 border-b border-border-subtle bg-emerald-500/[0.03] flex justify-between items-center group-hover:bg-emerald-500/[0.08] transition-colors">
-            <h3 className="text-[10px] font-black tracking-[0.3em] text-emerald-500 uppercase">قائمة العملاء</h3>
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 group-hover:scale-110 transition-transform">
-              <Users size={20} strokeWidth={2.5} />
-            </div>
-          </div>
-          <div className="p-6 flex flex-col gap-4">
-            {contacts.filter((c: any) => c.type === 'customer').map((contact: any) => (
-              <div key={contact.id} className="flex items-center gap-4 p-5 rounded-[28px] bg-on-surface/[0.02] border border-on-surface/5 group/item hover:bg-on-surface/[0.04] transition-all">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-500 font-black text-xs shadow-sm">
-                  {contact.initial || contact.name[0]}
-                </div>
-                <div className="flex-1">
-                  {editingId === contact.id && editingType === 'contact' ? (
-                    <input 
-                      autoFocus
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      onBlur={() => handleSave(contact.id)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSave(contact.id)}
-                      className="bg-on-surface/10 border border-emerald-500/30 rounded-xl px-4 py-2 text-on-surface text-right w-full outline-none focus:ring-1 focus:ring-emerald-500 font-bold"
-                    />
-                  ) : (
-                    <h4 className="font-bold text-on-surface text-right tracking-tight">{contact.name}</h4>
-                  )}
-                </div>
-                <div className="flex items-center gap-1 opacity-0 group-item-hover:opacity-100 transition-opacity">
-                  <button onClick={() => handleStartEdit(contact, 'contact')} className="w-9 h-9 flex items-center justify-center rounded-lg text-on-surface/20 hover:text-primary hover:bg-primary/10 transition-all">
-                    <Edit2 size={16} />
-                  </button>
-                  <button onClick={() => onDeleteContact(contact.id)} className="w-9 h-9 flex items-center justify-center rounded-lg text-on-surface/20 hover:text-red-500 hover:bg-red-500/10 transition-all">
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Suppliers */}
-        <div className="bg-surface-card border border-border-subtle rounded-[44px] shadow-lux overflow-hidden flex flex-col group">
-          <div className="p-8 border-b border-border-subtle bg-blue-500/[0.03] flex justify-between items-center group-hover:bg-blue-500/[0.08] transition-colors">
-            <h3 className="text-[10px] font-black tracking-[0.3em] text-blue-500 uppercase">قائمة الموردين</h3>
-            <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500 group-hover:-translate-y-1 transition-transform">
-              <Truck size={20} strokeWidth={2.5} />
-            </div>
-          </div>
-          <div className="p-6 flex flex-col gap-4">
-            {contacts.filter((c: any) => c.type === 'supplier').map((contact: any) => (
-              <div key={contact.id} className="flex items-center gap-4 p-5 rounded-[28px] bg-on-surface/[0.02] border border-on-surface/5 group/item hover:bg-on-surface/[0.04] transition-all">
-                <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-500 font-black text-xs shadow-sm">
-                  {contact.name[0]}
-                </div>
-                <div className="flex-1">
-                  {editingId === contact.id && editingType === 'contact' ? (
-                    <input 
-                      autoFocus
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      onBlur={() => handleSave(contact.id)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSave(contact.id)}
-                      className="bg-on-surface/10 border border-blue-500/30 rounded-xl px-4 py-2 text-on-surface text-right w-full outline-none focus:ring-1 focus:ring-blue-500 font-bold"
-                    />
-                  ) : (
-                    <h4 className="font-bold text-on-surface text-right tracking-tight">{contact.name}</h4>
-                  )}
-                </div>
-                <div className="flex items-center gap-1 opacity-0 group-item-hover:opacity-100 transition-opacity">
-                  <button onClick={() => handleStartEdit(contact, 'contact')} className="w-9 h-9 flex items-center justify-center rounded-lg text-on-surface/20 hover:text-primary hover:bg-primary/10 transition-all">
-                    <Edit2 size={16} />
-                  </button>
-                  <button onClick={() => onDeleteContact(contact.id)} className="w-9 h-9 flex items-center justify-center rounded-lg text-on-surface/20 hover:text-red-500 hover:bg-red-500/10 transition-all">
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 sm:gap-8">
+        <ManagementCard 
+          title="أصناف الإيرادات" 
+          icon={TrendingUp} 
+          items={categories.filter(c => c.type === 'income')} 
+          type="income"
+          colorClass="bg-primary/[0.03]"
+          accentColor="bg-primary text-black"
+        />
+        <ManagementCard 
+          title="أصناف المصروفات" 
+          icon={TrendingDown} 
+          items={categories.filter(c => c.type === 'expense')} 
+          type="expense"
+          colorClass="bg-red-500/[0.03]"
+          accentColor="bg-red-500 text-white"
+        />
+        <ManagementCard 
+          title="قائمة العملاء" 
+          icon={Users} 
+          items={contacts.filter(c => c.type === 'customer')} 
+          type="customer"
+          colorClass="bg-emerald-500/[0.03]"
+          accentColor="bg-emerald-500 text-white"
+          isContact={true}
+        />
+        <ManagementCard 
+          title="قائمة الموردين" 
+          icon={Truck} 
+          items={contacts.filter(c => c.type === 'supplier')} 
+          type="supplier"
+          colorClass="bg-blue-500/[0.03]"
+          accentColor="bg-blue-500 text-white"
+          isContact={true}
+        />
       </div>
     </div>
   );
 };
 
-const Contacts = ({ contacts, onPay, onAdd, onDelete }: { 
+const Contacts = ({ contacts, onPay, onAdd, onDelete, onUpdate }: { 
   contacts: any[], 
   onPay: (id: string, amount: number, isSupplier: boolean, isDebtIncrease?: boolean) => void,
   onAdd: (contact: any) => void,
-  onDelete: (id: string) => void
+  onDelete: (id: string) => void,
+  onUpdate: (id: string, name: string) => void
 }) => {
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [historyId, setHistoryId] = React.useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = React.useState<string | null>(null);
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [editName, setEditName] = React.useState('');
   const [amount, setAmount] = React.useState('');
   const [paymentMode, setPaymentMode] = React.useState<'pay' | 'debt'>('pay');
   const [showAddModal, setShowAddModal] = React.useState(false);
@@ -1124,6 +1211,20 @@ const Contacts = ({ contacts, onPay, onAdd, onDelete }: {
     setSelectedId(null);
     setAmount('');
     setPaymentMode('pay');
+  };
+
+  const handleStartEdit = (contact: any) => {
+    setEditingId(contact.id);
+    setEditName(contact.name);
+  };
+
+  const handleSaveEdit = async (id: string) => {
+    if (!editName.trim()) {
+      setEditingId(null);
+      return;
+    }
+    await onUpdate(id, editName);
+    setEditingId(null);
   };
 
   const handleAdd = () => {
@@ -1237,18 +1338,33 @@ const Contacts = ({ contacts, onPay, onAdd, onDelete }: {
                       {contacts.filter(c => c.type === 'customer').map((c, i) => (
                         <tr key={i} className="hover:bg-on-surface/[0.02] transition-colors group">
                           <td className="py-6 px-10">
-                            <button 
-                              onClick={() => setHistoryId(c.id)}
-                              className="flex items-center gap-4 text-right hover:text-primary transition-colors"
-                            >
-                              <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center text-black font-black text-sm uppercase shadow-lg", c.color)}>
+                            <div className="flex items-center gap-4 text-right">
+                              <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center text-black font-black text-sm uppercase shadow-lg shrink-0", c.color)}>
                                 {c.initial}
                               </div>
-                              <div className="flex flex-col">
-                              <span className="font-bold text-on-surface group-hover:text-primary transition-colors">{c.name}</span>
-                              <span className="text-[9px] text-on-surface-muted uppercase tracking-widest font-black">عرض السجل</span>
+                              <div className="flex flex-col flex-1 min-w-0">
+                                {editingId === c.id ? (
+                                  <input 
+                                    autoFocus
+                                    value={editName}
+                                    onChange={(e) => setEditName(e.target.value)}
+                                    onBlur={() => handleSaveEdit(c.id)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(c.id)}
+                                    className="bg-on-surface/10 border border-primary/30 rounded-xl px-4 py-2 text-on-surface text-right w-full outline-none focus:ring-1 focus:ring-primary font-bold text-sm"
+                                  />
+                                ) : (
+                                  <>
+                                    <button 
+                                      onClick={() => setHistoryId(c.id)}
+                                      className="font-bold text-on-surface hover:text-primary transition-colors text-right px-0"
+                                    >
+                                      {c.name}
+                                    </button>
+                                    <span className="text-[9px] text-on-surface-muted uppercase tracking-widest font-black">عرض السجل</span>
+                                  </>
+                                )}
                               </div>
-                            </button>
+                            </div>
                           </td>
                           <td className="py-6 px-10 font-black dark:text-red-400 text-red-600 tracking-tight">{formatCurrency(c.debt)}</td>
                           <td className="py-6 px-10 text-center">
@@ -1260,9 +1376,12 @@ const Contacts = ({ contacts, onPay, onAdd, onDelete }: {
                                 </div>
                               ) : (
                                 <>
-                                  <button onClick={() => { setSelectedId(c.id); setPaymentMode('pay'); }} className="p-3 text-on-surface/20 hover:text-emerald-500 transition-all rounded-xl hover:bg-on-surface/5" title="تحصيل مبلغ"><TrendingUp size={18} /></button>
-                                  <button onClick={() => { setSelectedId(c.id); setPaymentMode('debt'); }} className="p-3 text-on-surface/20 hover:text-red-500 transition-all rounded-xl hover:bg-on-surface/5" title="تسجيل مديونية جديدة"><PlusCircle size={18} /></button>
-                                  <button onClick={() => setDeleteConfirmId(c.id)} className="p-3 text-on-surface/20 hover:text-red-500 transition-all rounded-xl hover:bg-on-surface/5" title="حذف">
+                                  <button onClick={() => { setSelectedId(c.id); setPaymentMode('pay'); }} className="p-3 text-on-surface/40 hover:text-emerald-500 transition-all rounded-xl hover:bg-on-surface/5" title="تحصيل مبلغ"><TrendingUp size={18} /></button>
+                                  <button onClick={() => { setSelectedId(c.id); setPaymentMode('debt'); }} className="p-3 text-on-surface/40 hover:text-red-500 transition-all rounded-xl hover:bg-on-surface/5" title="تسجيل مديونية جديدة"><PlusCircle size={18} /></button>
+                                  <button onClick={() => handleStartEdit(c)} className="p-3 text-on-surface/40 hover:text-primary transition-all rounded-xl hover:bg-on-surface/5" title="تعديل الاسم">
+                                    <Edit2 size={16} />
+                                  </button>
+                                  <button onClick={() => setDeleteConfirmId(c.id)} className="p-3 text-on-surface/40 hover:text-red-500 transition-all rounded-xl hover:bg-on-surface/5" title="حذف">
                                     <Trash2 size={16} />
                                   </button>
                                 </>
@@ -1296,13 +1415,26 @@ const Contacts = ({ contacts, onPay, onAdd, onDelete }: {
                       {contacts.filter(c => c.type === 'supplier').map((s, i) => (
                         <tr key={i} className="hover:bg-on-surface/[0.02] transition-colors group">
                           <td className="py-6 px-10">
-                            <button 
-                              onClick={() => setHistoryId(s.id)}
-                              className="flex flex-col text-right hover:text-primary transition-colors"
-                            >
-                              <span className="font-bold text-on-surface group-hover:text-primary transition-colors">{s.name}</span>
-                              <span className="text-[10px] text-on-surface-muted font-medium mt-1 uppercase tracking-widest">سجل العمليات ←</span>
-                            </button>
+                            <div className="flex flex-col text-right">
+                              {editingId === s.id ? (
+                                <input 
+                                  autoFocus
+                                  value={editName}
+                                  onChange={(e) => setEditName(e.target.value)}
+                                  onBlur={() => handleSaveEdit(s.id)}
+                                  onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(s.id)}
+                                  className="bg-on-surface/10 border border-primary/30 rounded-xl px-4 py-2 text-on-surface text-right w-full outline-none focus:ring-1 focus:ring-primary font-bold text-sm"
+                                />
+                              ) : (
+                                <button 
+                                  onClick={() => setHistoryId(s.id)}
+                                  className="flex flex-col text-right hover:text-primary transition-colors px-0"
+                                >
+                                  <span className="font-bold text-on-surface group-hover:text-primary transition-colors">{s.name}</span>
+                                  <span className="text-[10px] text-on-surface-muted font-medium mt-1 uppercase tracking-widest">سجل العمليات ←</span>
+                                </button>
+                              )}
+                            </div>
                           </td>
                           <td className="py-6 px-10 font-black text-primary tracking-tight">{formatCurrency(s.balance || 0)}</td>
                           <td className="py-6 px-10 text-center">
@@ -1320,7 +1452,10 @@ const Contacts = ({ contacts, onPay, onAdd, onDelete }: {
                                   <button onClick={() => { setSelectedId(s.id); setPaymentMode('debt'); }} className="bg-on-surface/5 text-on-surface/60 border border-border-subtle hover:bg-red-500 hover:text-white hover:border-red-500 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
                                     مديونية جديدة
                                   </button>
-                                  <button onClick={() => setDeleteConfirmId(s.id)} className="p-2 text-on-surface/20 hover:text-red-500 transition-all rounded-xl hover:bg-on-surface/5"><Trash2 size={16} /></button>
+                                  <button onClick={() => handleStartEdit(s)} className="p-2 text-on-surface/40 hover:text-primary transition-all rounded-xl hover:bg-on-surface/5" title="تعديل">
+                                    <Edit2 size={16} />
+                                  </button>
+                                  <button onClick={() => setDeleteConfirmId(s.id)} className="p-2 text-on-surface/40 hover:text-red-500 transition-all rounded-xl hover:bg-on-surface/5"><Trash2 size={16} /></button>
                                 </>
                               )}
                             </div>
@@ -1574,10 +1709,12 @@ const Contacts = ({ contacts, onPay, onAdd, onDelete }: {
   );
 };
 
-const Inventory = ({ inventory, onUpdate, onAdd, onDelete }: any) => {
+const Inventory = ({ inventory, onUpdate, onAdd, onDelete, onRename }: any) => {
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [detailId, setDetailId] = React.useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = React.useState<string | null>(null);
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [editName, setEditName] = React.useState('');
   const [mode, setMode] = React.useState<'restock' | 'withdraw'>('restock');
   const [amount, setAmount] = React.useState('');
   const [price, setPrice] = React.useState('');
@@ -1597,6 +1734,20 @@ const Inventory = ({ inventory, onUpdate, onAdd, onDelete }: any) => {
     setSelectedId(null);
     setAmount('');
     setPrice('');
+  };
+
+  const handleStartRename = (item: any) => {
+    setEditingId(item.id);
+    setEditName(item.name);
+  };
+
+  const handleSaveRename = async (id: string) => {
+    if (!editName.trim()) {
+      setEditingId(null);
+      return;
+    }
+    await onRename(id, editName);
+    setEditingId(null);
   };
 
   const handleAddItem = () => {
@@ -1670,14 +1821,40 @@ const Inventory = ({ inventory, onUpdate, onAdd, onDelete }: any) => {
                   <td className="py-6 sm:py-8 px-6 sm:px-10">
                     <button 
                       onClick={() => setDetailId(item.id)}
-                      className="flex items-center gap-4 sm:gap-6 text-right hover:text-primary transition-all group/btn"
+                      className="flex items-center gap-4 sm:gap-6 text-right hover:text-primary transition-all group/btn relative"
                     >
-                      <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-[24px] bg-on-surface/5 flex items-center justify-center text-on-surface-muted group-hover:scale-110 group-hover/btn:bg-primary group-hover/btn:text-black transition-all border border-on-surface/5 shadow-sm">
-                        <item.icon size={22} className="sm:w-7 sm:h-7" strokeWidth={1.5} />
+                      <div className="relative">
+                        <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-[24px] bg-on-surface/5 flex items-center justify-center text-on-surface-muted group-hover:scale-110 group-hover/btn:bg-primary group-hover/btn:text-black transition-all border border-on-surface/5 shadow-sm">
+                          <item.icon size={22} className="sm:w-7 sm:h-7" strokeWidth={1.5} />
+                        </div>
+                        <div className={cn(
+                          "absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-surface-card flex items-center justify-center shadow-sm",
+                          item.status === 'available' ? "bg-emerald-500" : item.status === 'low' ? "bg-amber-500" : "bg-red-500"
+                        )}>
+                          {item.status === 'available' ? <Check size={8} className="text-white" strokeWidth={4} /> : item.status === 'low' ? <AlertTriangle size={8} className="text-white" strokeWidth={4} /> : <X size={8} className="text-white" strokeWidth={4} />}
+                        </div>
                       </div>
-                      <div className="flex flex-col gap-0.5 sm:gap-1">
-                        <span className="font-black text-on-surface text-lg sm:text-xl tracking-tight leading-none group-hover/btn:text-primary transition-colors">{item.name}</span>
-                        <span className="text-[8px] sm:text-[10px] text-on-surface-muted uppercase font-black tracking-widest opacity-40 group-hover/btn:text-primary/60">تفاصيل الجرد ←</span>
+                      <div className="flex flex-col gap-0.5 sm:gap-1 flex-1 min-w-0">
+                        {editingId === item.id ? (
+                          <input 
+                            autoFocus
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            onBlur={() => handleSaveRename(item.id)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSaveRename(item.id)}
+                            className="bg-on-surface/10 border border-primary/30 rounded-xl px-4 py-2 text-on-surface text-right w-full outline-none focus:ring-1 focus:ring-primary font-bold text-sm"
+                          />
+                        ) : (
+                          <>
+                            <button 
+                              onClick={() => setDetailId(item.id)}
+                              className="font-black text-on-surface text-lg sm:text-xl tracking-tight leading-none hover:text-primary transition-colors text-right px-0"
+                            >
+                              {item.name}
+                            </button>
+                            <span className="text-[8px] sm:text-[10px] text-on-surface-muted uppercase font-black tracking-widest opacity-40">تفاصيل الجرد ←</span>
+                          </>
+                        )}
                       </div>
                     </button>
                   </td>
@@ -1701,7 +1878,7 @@ const Inventory = ({ inventory, onUpdate, onAdd, onDelete }: any) => {
                           <button onClick={() => setDeleteConfirmId(null)} className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center text-on-surface-muted hover:bg-on-surface/10 rounded-xl transition-all"><X size={14} /></button>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-3 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <div className="flex items-center gap-3 opacity-100 transition-opacity duration-300">
                           <button 
                             onClick={() => { setSelectedId(item.id); setMode('restock'); }} 
                             className="bg-primary/10 text-primary border border-primary/20 hover:bg-primary hover:text-black px-4 sm:px-6 py-2 sm:py-3 rounded-xl sm:rounded-2xl text-[8px] sm:text-[10px] font-black uppercase tracking-widest transition-all shadow-sm"
@@ -1713,6 +1890,13 @@ const Inventory = ({ inventory, onUpdate, onAdd, onDelete }: any) => {
                             className="bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white px-4 sm:px-6 py-2 sm:py-3 rounded-xl sm:rounded-2xl text-[8px] sm:text-[10px] font-black uppercase tracking-widest transition-all shadow-sm"
                           >
                             سحب
+                          </button>
+                          <button 
+                            onClick={() => handleStartRename(item)} 
+                            className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-on-surface/5 text-on-surface-muted hover:text-primary hover:bg-primary/10 rounded-xl sm:rounded-2xl transition-all border border-on-surface/5"
+                            title="تعديل الاسم"
+                          >
+                            <Edit2 size={14} className="sm:w-4.5 sm:h-4.5" />
                           </button>
                           <button 
                             onClick={() => setDeleteConfirmId(item.id)} 
@@ -2298,12 +2482,18 @@ export default function App() {
     }
   };
 
-  const addTransaction = async (data: Omit<Transaction, 'id' | 'date' | 'timestamp'>) => {
+  const addTransaction = async (data: Omit<Transaction, 'id' | 'date' | 'timestamp'> & { customDate?: string }) => {
     if (!user) return;
-    const date = new Date().toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' }) + ' ' + new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+    const date = data.customDate 
+      ? new Date(data.customDate).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' }) + ' ' + new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
+      : new Date().toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' }) + ' ' + new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+    
+    // Create a new data object without customDate for Firestore
+    const { customDate, ...firestoreData } = data;
+    
     try {
       await addDoc(collection(db, 'transactions'), {
-        ...data,
+        ...firestoreData,
         date,
         timestamp: Date.now(),
         userId: user.uid
@@ -2355,12 +2545,23 @@ export default function App() {
     }
   };
 
-  const handlePayment = async (id: string, amount: number, isSupplier: boolean, isDebtIncrease: boolean = false) => {
+  const renameInventoryItem = async (id: string, newName: string) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, 'inventory', id), { name: newName });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `inventory/${id}`);
+    }
+  };
+
+  const handlePayment = async (id: string, amount: number, isSupplier: boolean, isDebtIncrease: boolean = false, customDate?: string) => {
     if (!user) return;
     const contact = contacts.find(c => c.id === id);
     if (!contact) return;
 
-    const date = new Date().toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' }) + ' ' + new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+    const date = customDate 
+      ? new Date(customDate).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' }) + ' ' + new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
+      : new Date().toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' }) + ' ' + new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
     
     if (isSupplier) {
       const adjustment = isDebtIncrease ? amount : -amount;
@@ -2372,12 +2573,12 @@ export default function App() {
           history: newHistory
         });
         if (!isDebtIncrease) {
-          addTransaction({ description: `سداد مورد: ${contact.name}`, amount, type: 'expense', category: 'payment' });
+          addTransaction({ description: `سداد مورد: ${contact.name}`, amount, type: 'expense', category: 'payment', customDate });
         } else {
           // If it's a debt increase (receiving supplies without paying), it's conceptually an expense that will be paid later.
           // But usually, we only record cash transactions in the finance section. 
           // However, user specifically asked for "sync with expenses".
-          addTransaction({ description: `زيادة مديونية مورد: ${contact.name}`, amount, type: 'expense', category: 'debt' });
+          addTransaction({ description: `زيادة مديونية مورد: ${contact.name}`, amount, type: 'expense', category: 'debt', customDate });
         }
       } catch (error) {
         handleFirestoreError(error, OperationType.UPDATE, `contacts/${id}`);
@@ -2392,10 +2593,10 @@ export default function App() {
           history: newHistory
         });
         if (!isDebtIncrease) {
-          addTransaction({ description: `تحصيل دين: ${contact.name}`, amount, type: 'income', category: 'debt' });
+          addTransaction({ description: `تحصيل دين: ${contact.name}`, amount, type: 'income', category: 'debt', customDate });
         } else {
           // New debt usually means a sale that wasn't paid for.
-          addTransaction({ description: `تسجيل مديونية عميل: ${contact.name}`, amount, type: 'income', category: 'sale' });
+          addTransaction({ description: `تسجيل مديونية عميل: ${contact.name}`, amount, type: 'income', category: 'sale', customDate });
         }
       } catch (error) {
         handleFirestoreError(error, OperationType.UPDATE, `contacts/${id}`);
@@ -2523,12 +2724,14 @@ export default function App() {
                       categories={financeCategories}
                       onAdd={addTransaction} 
                       onAddCategory={addFinanceCategory}
+                      onUpdateCategory={updateFinanceCategory}
+                      onDeleteCategory={deleteFinanceCategory}
                       contacts={contacts}
                       onPay={handlePayment}
                     />
                   )}
-                  {view === 'contacts' && <Contacts contacts={contacts} onPay={handlePayment} onAdd={addContact} onDelete={deleteContact} />}
-                  {view === 'inventory' && <Inventory inventory={inventory} onUpdate={updateInventory} onAdd={addInventoryItem} onDelete={deleteInventoryItem} />}
+                  {view === 'contacts' && <Contacts contacts={contacts} onPay={handlePayment} onAdd={addContact} onDelete={deleteContact} onUpdate={updateContact} />}
+                  {view === 'inventory' && <Inventory inventory={inventory} onUpdate={updateInventory} onAdd={addInventoryItem} onDelete={deleteInventoryItem} onRename={renameInventoryItem} />}
                   {view === 'reports' && (
                     <Reports 
                       transactions={transactions} 
@@ -2542,9 +2745,11 @@ export default function App() {
                       categories={financeCategories}
                       onUpdate={updateFinanceCategory}
                       onDelete={deleteFinanceCategory}
+                      onAdd={addFinanceCategory}
                       contacts={contacts}
                       onUpdateContact={updateContact}
                       onDeleteContact={deleteContact}
+                      onAddContact={addContact}
                     />
                   )}
                 </>
@@ -2585,6 +2790,8 @@ export default function App() {
 
 const Reports = ({ transactions, inventory, onEditTransaction, onDeleteTransaction }: any) => {
   const [range, setRange] = React.useState<'day' | 'month' | 'custom' | 'all'>('all');
+  const [showIncomeDetails, setShowIncomeDetails] = React.useState(false);
+  const [expandedDay, setExpandedDay] = React.useState<string | null>(null);
   const [startDate, setStartDate] = React.useState('');
   const [endDate, setEndDate] = React.useState('');
   const [editingTransaction, setEditingTransaction] = React.useState<any>(null);
@@ -2658,13 +2865,37 @@ const Reports = ({ transactions, inventory, onEditTransaction, onDeleteTransacti
   };
 
   const { prevIncome, prevExpense } = getPreviousPeriodTotals();
-  const rangeIncome = filteredTransactions.filter((t: any) => t.type === 'income').reduce((acc: number, t: any) => acc + t.amount, 0);
-  const rangeExpense = filteredTransactions.filter((t: any) => t.type === 'expense').reduce((acc: number, t: any) => acc + t.amount, 0);
+  const incomeTransactions = filteredTransactions.filter((t: any) => t.type === 'income');
+  const expenseTransactions = filteredTransactions.filter((t: any) => t.type === 'expense');
+
+  const rangeIncome = incomeTransactions.reduce((acc: number, t: any) => acc + t.amount, 0);
+  const rangeExpense = expenseTransactions.reduce((acc: number, t: any) => acc + t.amount, 0);
   
   const incomeChange = prevIncome > 0 ? ((rangeIncome - prevIncome) / prevIncome * 100).toFixed(1) : null;
   const expenseChange = prevExpense > 0 ? ((rangeExpense - prevExpense) / prevExpense * 100).toFixed(1) : null;
   
   const inventoryValue = inventory.reduce((acc: number, item: any) => acc + (item.quantity * item.price), 0);
+
+  // Group by category for the summary
+  const categoryTotals = filteredTransactions.reduce((acc: any, t: any) => {
+    const cat = t.category || 'عام';
+    if (!acc[cat]) acc[cat] = { income: 0, expense: 0, count: 0 };
+    if (t.type === 'income') acc[cat].income += t.amount;
+    else acc[cat].expense += t.amount;
+    acc[cat].count += 1;
+    return acc;
+  }, {});
+
+  // Group by day for daily totals
+  const dailyTotals = filteredTransactions.reduce((acc: any, t: any) => {
+    const dateStr = t.timestamp ? new Date(t.timestamp).toLocaleDateString('ar-EG') : t.date.split(' ')[0];
+    if (!acc[dateStr]) acc[dateStr] = { income: 0, expense: 0, net: 0, items: [] };
+    if (t.type === 'income') acc[dateStr].income += t.amount;
+    else acc[dateStr].expense += t.amount;
+    acc[dateStr].net = acc[dateStr].income - acc[dateStr].expense;
+    acc[dateStr].items.push(t);
+    return acc;
+  }, {});
   
   const ranges = [
     { id: 'day', label: 'اليوم' },
@@ -2718,20 +2949,33 @@ const Reports = ({ transactions, inventory, onEditTransaction, onDeleteTransacti
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
         <div className="bg-surface-card p-6 sm:p-10 rounded-[32px] sm:rounded-[40px] border border-border-subtle shadow-lux flex flex-col justify-between group relative overflow-hidden min-h-[160px] sm:min-h-[200px]">
-          <div className="absolute -right-4 -top-4 w-32 h-32 bg-primary/5 rounded-full blur-3xl"></div>
-          <p className="text-[8px] sm:text-[10px] uppercase tracking-widest font-black text-on-surface-muted/60 mb-4 sm:mb-6 leading-none">إجمالي الإيرادات (الفترة)</p>
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl sm:text-4xl font-black text-primary tracking-tight tabular-nums leading-none">{formatCurrency(rangeIncome)}</span>
-          </div>
-          <div className="flex items-center gap-2 mt-6 text-emerald-500 text-[9px] sm:text-[10px] font-black">
-            {incomeChange ? (
-              <>
-                <TrendingUp size={14} className={parseFloat(incomeChange) < 0 ? "rotate-180 text-red-400" : ""} />
-                <span className={cn(parseFloat(incomeChange) < 0 ? "text-red-400" : "")}>{incomeChange}% عن الفترة السابقة</span>
-              </>
-            ) : (
-              <span className="text-on-surface-muted opacity-40">لا توجد بيانات مقارنة</span>
-            )}
+          <button 
+            onClick={() => setShowIncomeDetails(true)}
+            className="absolute inset-0 z-10 text-right appearance-none"
+            aria-label="عرض تفاصيل الإيرادات"
+          />
+          <div className="absolute -right-4 -top-4 w-32 h-32 bg-primary/5 rounded-full blur-3xl group-hover:bg-primary/10 transition-colors"></div>
+          <div className="relative z-0">
+            <div className="flex justify-between items-start">
+              <p className="text-[8px] sm:text-[10px] uppercase tracking-widest font-black text-on-surface-muted/60 mb-4 sm:mb-6 leading-none">إجمالي الإيرادات (الفترة)</p>
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <ChevronDown size={14} className="text-primary -rotate-90" />
+              </div>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl sm:text-4xl font-black text-primary tracking-tight tabular-nums leading-none">{formatCurrency(rangeIncome)}</span>
+            </div>
+            <div className="flex items-center gap-2 mt-6 text-emerald-500 text-[9px] sm:text-[10px] font-black">
+              {incomeChange ? (
+                <>
+                  <TrendingUp size={14} className={parseFloat(incomeChange) < 0 ? "rotate-180 text-red-400" : ""} />
+                  <span className={cn(parseFloat(incomeChange) < 0 ? "text-red-400" : "")}>{incomeChange}% عن الفترة السابقة</span>
+                </>
+              ) : (
+                <span className="text-on-surface-muted opacity-40">لا توجد بيانات مقارنة</span>
+              )}
+            </div>
+            <p className="text-[8px] font-black text-primary/40 uppercase tracking-widest mt-4 opacity-0 group-hover:opacity-100 transition-opacity">اضغط لعرض التفاصيل</p>
           </div>
         </div>
 
@@ -2762,6 +3006,114 @@ const Reports = ({ transactions, inventory, onEditTransaction, onDeleteTransacti
             <span className="text-3xl sm:text-4xl font-black text-on-surface tracking-tight tabular-nums leading-none">{formatCurrency(rangeIncome - rangeExpense)}</span>
           </div>
           <p className="text-[9px] sm:text-[10px] text-on-surface-muted/30 mt-6 italic font-medium">الأرباح التشغيلية المحققة بعد خصم التكاليف</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
+        <div className="lg:col-span-8 flex flex-col gap-8">
+          <div className="bg-sidebar border border-white/5 rounded-[40px] shadow-2xl p-8 h-full flex flex-col">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                  <Calculator size={20} />
+                </div>
+                <h3 className="text-sm font-black tracking-widest text-white/80 uppercase">ملخص النقدية اليومي</h3>
+              </div>
+              <span className="text-[10px] text-white/20 font-bold">آخر الحركات</span>
+            </div>
+            <div className="space-y-3 overflow-y-auto custom-scrollbar flex-1 max-h-[400px]">
+              {Object.keys(dailyTotals).length > 0 ? Object.entries(dailyTotals).sort((a,b) => b[0].localeCompare(a[0])).map(([date, data]: [string, any]) => (
+                <div key={date} className="flex flex-col gap-2">
+                  <button 
+                    onClick={() => setExpandedDay(expandedDay === date ? null : date)}
+                    className={cn(
+                      "flex items-center justify-between p-5 bg-white/[0.02] rounded-3xl border border-white/5 hover:border-white/10 transition-all text-right w-full",
+                      expandedDay === date && "bg-white/[0.05] border-white/10"
+                    )}
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-bold text-white text-sm">{date}</span>
+                      <div className="flex gap-3 text-[9px] font-bold mt-1">
+                        <span className="text-emerald-500">وارده: {formatCurrency(data.income)}</span>
+                        <span className="text-red-400">صادرة: {formatCurrency(data.expense)}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-left">
+                        <p className={cn("font-black text-lg", data.net >= 0 ? "text-emerald-500" : "text-red-400")}>
+                          {data.net >= 0 ? '+' : ''}{formatCurrency(data.net)}
+                        </p>
+                      </div>
+                      <ChevronDown size={16} className={cn("text-white/20 transition-transform", expandedDay === date && "rotate-180")} />
+                    </div>
+                  </button>
+                  
+                  {expandedDay === date && (
+                    <motion.div 
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      className="overflow-hidden bg-black/20 rounded-3xl border border-white/5 divide-y divide-white/[0.02]"
+                    >
+                      {data.items.sort((a: any, b: any) => {
+                        if (a.type === 'income' && b.type !== 'income') return -1;
+                        if (a.type !== 'income' && b.type === 'income') return 1;
+                        return (b.timestamp || 0) - (a.timestamp || 0);
+                      }).map((t: any) => (
+                        <div key={t.id} className="p-4 flex items-center justify-between group">
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-white/80">{t.description}</span>
+                            <span className="text-[8px] uppercase tracking-widest font-black text-white/20">
+                              {t.category === 'sales' ? 'مبيعات' : t.category === 'payment' ? 'سداد مورد' : t.category === 'debt' ? 'ديون' : t.category || 'عام'}
+                            </span>
+                          </div>
+                          <span className={cn("text-sm font-black tabular-nums", t.type === 'income' ? "text-emerald-500" : "text-red-500/80")}>
+                            {t.type === 'income' ? '+' : '-'}{formatCurrency(t.amount)}
+                          </span>
+                        </div>
+                      ))}
+                    </motion.div>
+                  )}
+                </div>
+              )) : (
+                <p className="text-center py-20 text-on-surface-muted/30 text-xs italic">لا توجد بيانات متاحة لهذا النطاق</p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="lg:col-span-4 h-full">
+          <div className="bg-sidebar border border-white/5 rounded-[40px] shadow-2xl p-8 h-full flex flex-col">
+            <div className="flex items-center gap-3 mb-8">
+              <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                <Package size={20} />
+              </div>
+              <h3 className="text-sm font-black tracking-widest text-white/80 uppercase">ملخص البنود</h3>
+            </div>
+            <div className="space-y-4 overflow-y-auto custom-scrollbar flex-1 max-h-[400px]">
+              {Object.keys(categoryTotals).length > 0 ? Object.entries(categoryTotals).map(([cat, data]: [string, any]) => (
+                <div key={cat} className="p-5 bg-white/[0.02] rounded-3xl border border-white/5">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-bold text-white text-xs">{cat === 'sales' ? 'مبيعات' : cat === 'expense' ? 'مصروف عام' : cat === 'payment' ? 'سداد موردين' : cat === 'debt' ? 'ديون' : cat}</span>
+                    <span className="text-[10px] text-white/20 font-black">{data.count} حركه</span>
+                  </div>
+                  <div className="flex justify-between items-end">
+                    <div className="h-1 w-2/3 bg-white/5 rounded-full overflow-hidden">
+                      <div 
+                        className={cn("h-full rounded-full", data.income > 0 ? "bg-emerald-500" : "bg-red-400")} 
+                        style={{ width: `${Math.min(100, (Math.max(data.income, data.expense) / (rangeIncome + rangeExpense || 1)) * 300)}%` }}
+                      ></div>
+                    </div>
+                    <div className="text-right">
+                      {data.income > 0 && <p className="text-emerald-500 font-black text-[10px]">+{formatCurrency(data.income)}</p>}
+                      {data.expense > 0 && <p className="text-red-400 font-black text-[10px]">-{formatCurrency(data.expense)}</p>}
+                    </div>
+                  </div>
+                </div>
+              )) : (
+                <p className="text-center py-20 text-on-surface-muted/30 text-xs italic">لا يوجد بنود مسجلة</p>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -2877,6 +3229,85 @@ const Reports = ({ transactions, inventory, onEditTransaction, onDeleteTransacti
       </div>
 
       <AnimatePresence>
+        {showIncomeDetails && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-xl z-[100] flex items-center justify-center p-4 sm:p-8">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="bg-sidebar w-full max-w-4xl max-h-[80vh] rounded-[40px] border border-white/10 flex flex-col shadow-3xl overflow-hidden"
+            >
+              <div className="p-8 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                    <TrendingUp size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-white">تفاصيل الإيرادات</h3>
+                    <p className="text-[10px] uppercase tracking-widest font-bold text-white/30">كافة الحركات الواردة للفترة المختارة</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setShowIncomeDetails(false)}
+                  className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-white hover:bg-white/10 transition-all active:scale-90"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+                {incomeTransactions.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-right">
+                      <thead>
+                        <tr className="border-b border-white/5">
+                          <th className="pb-4 px-4 text-[10px] uppercase font-black tracking-widest text-white/20">التاريخ</th>
+                          <th className="pb-4 px-4 text-[10px] uppercase font-black tracking-widest text-white/20">الوصف</th>
+                          <th className="pb-4 px-4 text-[10px] uppercase font-black tracking-widest text-white/20">الفئة</th>
+                          <th className="pb-4 px-4 text-[10px] uppercase font-black tracking-widest text-white/20 text-left">المبلغ</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/[0.02]">
+                        {incomeTransactions.sort((a, b) => b.timestamp - a.timestamp).map((t: any) => (
+                          <tr key={t.id} className="group hover:bg-white/[0.02] transition-colors">
+                            <td className="py-4 px-4">
+                              <span className="text-xs font-bold text-white/60 tabular-nums">{t.date}</span>
+                            </td>
+                            <td className="py-4 px-4">
+                              <span className="text-sm font-bold text-white">{t.description}</span>
+                            </td>
+                            <td className="py-4 px-4">
+                              <span className="inline-flex px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-500 text-[10px] font-black uppercase tracking-widest">
+                                {t.category === 'sales' ? 'مبيعات' : t.category === 'debt' ? 'ديون' : t.category}
+                              </span>
+                            </td>
+                            <td className="py-4 px-4 text-left">
+                              <span className="text-base font-black text-emerald-500 tabular-nums">+{formatCurrency(t.amount)}</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-20 opacity-20">
+                    <TrendingUp size={64} className="mb-4" />
+                    <p className="text-xl font-black uppercase tracking-widest">لا توجد إيرادات مسجلة</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-8 border-t border-white/5 bg-white/[0.02] flex justify-between items-center">
+                <span className="text-xs font-bold text-white/40">إجمالي الفترة المحددة ({incomeTransactions.length} حركة)</span>
+                <div className="text-right">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-white/20 mb-1">المجموع الكلي</p>
+                  <p className="text-2xl font-black text-primary tabular-nums">{formatCurrency(rangeIncome)}</p>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
         {editingTransaction && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[100] flex items-center justify-center p-6">
             <motion.div 
