@@ -4,37 +4,42 @@
 @theme {
   --font-sans: "IBM Plex Sans Arabic", ui-sans-serif, system-ui, sans-serif;
 
-  --color-primary: #c5a059;
+  --color-primary: #d4af37;
   --color-primary-foreground: #000000;
-  --color-accent: #c5a059;
+  --color-accent: #d4af37;
 
   --color-bakery-surface: var(--color-bakery-surface);
   --color-sidebar: var(--color-sidebar);
   --color-surface-card: var(--color-surface-card);
   --color-on-surface: var(--color-on-surface);
   --color-on-surface-muted: var(--color-on-surface-muted);
+  --color-border-subtle: var(--color-border-subtle);
   
-  --radius-xl: 1rem;
-  --radius-2xl: 1.5rem;
-  --radius-3xl: 2rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.75rem;
+  --radius-3xl: 2.5rem;
+
+  --shadow-lux: 0 20px 50px rgba(0, 0, 0, 0.3);
 }
 
 :root {
-  --color-bakery-surface: #0a0a0a;
-  --color-sidebar: #121212;
-  --color-surface-card: #161616;
-  --color-on-surface: #e0e0e0;
-  --color-on-surface-muted: rgba(255, 255, 255, 0.4);
+  --color-bakery-surface: #0c0b0a;
+  --color-sidebar: #141311;
+  --color-surface-card: #1c1b18;
+  --color-on-surface: #f5f2e8;
+  --color-on-surface-muted: rgba(245, 242, 232, 0.5);
+  --color-border-subtle: rgba(255, 255, 255, 0.05);
   --surface-variant: rgba(255, 255, 255, 0.03);
 }
 
 .light {
-  --color-bakery-surface: #f9f8f3;
-  --color-sidebar: #f2f1e9;
+  --color-bakery-surface: #f8f9fa;
+  --color-sidebar: #ffffff;
   --color-surface-card: #ffffff;
-  --color-on-surface: #2d2b28;
-  --color-on-surface-muted: #6e6a64;
-  --surface-variant: rgba(45, 43, 40, 0.05);
+  --color-on-surface: #1a1917;
+  --color-on-surface-muted: #6b7280;
+  --color-border-subtle: rgba(0, 0, 0, 0.08);
+  --surface-variant: rgba(0, 0, 0, 0.02);
 }
 
 @layer base {
@@ -42,8 +47,16 @@
     direction: rtl;
   }
   body {
-    @apply bg-bakery-surface text-on-surface font-sans antialiased transition-colors duration-300;
+    @apply bg-bakery-surface text-on-surface font-sans antialiased transition-colors duration-500 selection:bg-primary/30;
   }
+}
+
+.glass {
+  @apply bg-surface-card/40 backdrop-blur-xl border border-white/5;
+}
+
+.light .glass {
+  @apply bg-white/60 border-black/5;
 }
 
 /* Custom chart gradients */

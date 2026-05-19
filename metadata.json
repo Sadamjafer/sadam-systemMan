@@ -2,5 +2,5 @@
   "name": "مخبز البركة | إدارة الإنتاج",
   "description": "نظام إدارة احترافي للمخابز لمتابعة المخزون، المالية، وديون العملاء والموردين.",
   "requestFramePermissions": [],
-  "majorCapabilities": []
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
